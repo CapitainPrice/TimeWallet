@@ -941,6 +941,36 @@ function isDiaUtil(date){
   return true;
 }
 
+/* ---------- Reverse Geocoding (Nominatim/OpenStreetMap) ---------- */
+const GEOCODING_CACHE = new Map();
+
+async function reverseGeocode(lat, lng) {
+  const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+  if (GEOCODING_CACHE.has(key)) return GEOCODING_CACHE.get(key);
+
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=pt-BR`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    if (!response.ok) throw new Error('Geocoding failed');
+    const data = await response.json();
+    let address = "Endereço não encontrado";
+    if (data.display_name) {
+      // Simplify: show road + neighbourhood/city + state
+      const parts = data.display_name.split(',').map(s => s.trim());
+      // Take first 3 meaningful parts
+      const relevant = parts.slice(0, 3).filter(p => p.length > 1);
+      address = relevant.join(', ');
+    }
+    GEOCODING_CACHE.set(key, address);
+    return address;
+  } catch (e) {
+    console.warn('Reverse geocoding error:', e);
+    return `Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}`;
+  }
+}
+
 /* ---------- Tempo extra ---------- */
 function calcularExtra(saidaStr){
   const [h,m] = saidaStr.split(":").map(Number);
@@ -1027,7 +1057,7 @@ function carregarRegistroHoje(){
       exibirComprovante(comprovanteBase64);
     }
     if(comprovanteLocalizacao){
-      exibirStatusGeo(`Localização registrada (${comprovanteLocalizacao.lat.toFixed(5)}, ${comprovanteLocalizacao.lng.toFixed(5)})`);
+      exibirStatusGeo(`Localização: ${getLocationDisplay(comprovanteLocalizacao)}`);
     }
     mostrarResultado(reg.extraMin);
   }
@@ -1045,6 +1075,17 @@ function exibirStatusGeo(texto){
   el.textContent = texto;
 }
 
+function getLocationDisplay(loc) {
+  if (!loc) return "Não registrada";
+  if (loc.address) return loc.address;
+  return `Lat: ${loc.lat.toFixed(5)}, Lng: ${loc.lng.toFixed(5)}`;
+}
+
+function getLocationMapLink(loc) {
+  if (!loc) return `<span style="color:var(--muted);font-size:11px;">Não registrada</span>`;
+  return `<a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" rel="noopener" style="color:var(--primary-dark);font-size:11px;">Ver no mapa</a>`;
+}
+
 function preencherHorarioAtual(){
   const agora = new Date();
   const hh = String(agora.getHours()).padStart(2,"0");
@@ -1059,9 +1100,14 @@ function capturarLocalizacao(){
   }
   exibirStatusGeo("Obtendo localização...");
   navigator.geolocation.getCurrentPosition(
-    (pos)=>{
-      comprovanteLocalizacao = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      exibirStatusGeo(`Localização registrada (${comprovanteLocalizacao.lat.toFixed(5)}, ${comprovanteLocalizacao.lng.toFixed(5)})`);
+    async (pos)=>{
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      comprovanteLocalizacao = { lat, lng };
+      exibirStatusGeo("Obtendo endereço...");
+      const address = await reverseGeocode(lat, lng);
+      comprovanteLocalizacao.address = address;
+      exibirStatusGeo(`Localização: ${address}`);
       salvarRegistroHoje();
     },
     ()=>{
@@ -1220,7 +1266,7 @@ function renderPaginaRegistro(){
   const linhasHtml = fatia.map(({ date, reg })=>{
     const estado = reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "";
     const diaLabel = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
-    const localizacao = reg.localizacao ? `<a href="https://www.google.com/maps?q=${reg.localizacao.lat},${reg.localizacao.lng}" target="_blank" rel="noopener" style="color:var(--primary-dark);font-size:11px;">Ver no mapa</a>` : `<span style="color:var(--muted);font-size:11px;">Não registrada</span>`;
+    const localizacao = reg.localizacao ? getLocationMapLink(reg.localizacao) : `<span style="color:var(--muted);font-size:11px;">Não registrada</span>`;
     return `
       <div class="reg-row ${estado}">
         <span class="col-dia">${diaLabel}</span>
@@ -1495,6 +1541,7 @@ function mostrarDetalhe(key, date){
   const [diaNome, diaData] = dataFmt.split(" ");
   const heroClass = reg.extraMin === 0 ? "detail-hero hero-muted" : "detail-hero";
   const heroBg = reg.extraMin === 0 ? "" : `background:${reg.extraMin < 0 ? 'var(--danger)' : 'var(--primary)'};`;
+  const localizacaoHtml = reg.localizacao ? getLocationMapLink(reg.localizacao) : "Não registrada";
   area.innerHTML = `
     <div class="detail-card">
       <div class="detail-day">
@@ -1524,7 +1571,7 @@ function mostrarDetalhe(key, date){
           <div class="di-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
           </div>
-          <div class="di-text"><span class="di-k">Localização</span><span class="di-v">${reg.localizacao ? `<a href="https://www.google.com/maps?q=${reg.localizacao.lat},${reg.localizacao.lng}" target="_blank" rel="noopener" style="color:var(--primary-dark);">Ver no mapa</a>` : "Não registrada"}</span></div>
+          <div class="di-text"><span class="di-k">Localização</span><span class="di-v">${localizacaoHtml}</span></div>
         </div>
       </div>
 
@@ -1565,7 +1612,7 @@ function gerarImagem(){
     const reg = registros[key];
     if(!reg) continue;
     const diaLabel = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
-    const localizacao = reg.localizacao ? `${reg.localizacao.lat.toFixed(5)}, ${reg.localizacao.lng.toFixed(5)}` : "Não registrada";
+    const localizacao = reg.localizacao && reg.localizacao.address ? reg.localizacao.address : (reg.localizacao ? `${reg.localizacao.lat.toFixed(5)}, ${reg.localizacao.lng.toFixed(5)}` : "Não registrada");
     dados.push({ dia: diaLabel, ponto: "15:00", saida: reg.saida, localizacao, extra: formatarExtra(reg.extraMin), estado: reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "neutro" });
   }
 
