@@ -384,19 +384,23 @@
     margin-top:2px;
   }
   .reg-row{
-    display:flex;
+    display:grid;
+    grid-template-columns: 1.5fr 0.7fr 0.8fr 1fr;
     align-items:center;
     gap:8px;
     padding:10px 4px;
-    font-size:13px;
+    font-size:12px;
     border-bottom:1px solid #ECEFE6;
   }
   .reg-row:last-child{border-bottom:none;}
-  .reg-row .col-dia{flex:1.3;font-weight:600;color:var(--text);}
-  .reg-row .col-saida{flex:1;color:var(--muted);}
-  .reg-row .col-extra{flex:1;text-align:right;font-weight:700;color:var(--muted);}
-  .reg-row.positivo .col-extra{color:var(--primary-dark);}
-  .reg-row.negativo .col-extra{color:var(--danger);}
+  .reg-row .col-dia{font-weight:600;color:var(--text);}
+  .reg-row .col-ponto{color:var(--muted);text-align:center;}
+  .reg-row .col-saida{font-weight:700;color:var(--text);text-align:center;}
+  .reg-row .col-local{font-size:11px;text-align:center;}
+  .reg-row.positivo .col-saida{color:var(--primary-dark);}
+  .reg-row.negativo .col-saida{color:var(--danger);}
+  .reg-row.positivo .col-local{color:var(--primary-dark);}
+  .reg-row.negativo .col-local{color:var(--danger);}
 
   .reg-paginacao{
     display:flex;
@@ -415,6 +419,25 @@
     cursor:pointer;
   }
   .reg-pagina-btn.ativa{background:var(--primary);color:#fff;}
+
+  .reg-header{
+    display:grid;
+    grid-template-columns: 1.5fr 0.7fr 0.8fr 1fr;
+    align-items:center;
+    gap:8px;
+    padding:8px 4px;
+    font-size:11px;
+    font-weight:700;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    border-bottom:2px solid #ECEFE6;
+    margin-bottom:4px;
+  }
+  .reg-header .col-dia{text-align:left;}
+  .reg-header .col-ponto{text-align:center;}
+  .reg-header .col-saida{text-align:center;}
+  .reg-header .col-local{text-align:center;}
 
   .cal-card{
     background:var(--card);
@@ -773,15 +796,21 @@
           <div class="month" id="regPeriodoLabel">—</div>
           <button id="regNextPeriod">›</button>
         </div>
+        <div class="reg-header">
+          <span class="col-dia">Dia</span>
+          <span class="col-ponto">Ponto</span>
+          <span class="col-saida">Saída</span>
+          <span class="col-local">Localização</span>
+        </div>
         <div class="reg-tabela" id="regTabela"></div>
         <div class="reg-paginacao" id="regPaginacao"></div>
       </div>
 
       <button class="btn" id="exportarBtn" style="margin-top:16px;">
         <span class="btn-ico">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
         </span>
-        Exportar planilha
+        Gerar imagem
       </button>
     </div>
   </div>
@@ -1190,12 +1219,14 @@ function renderPaginaRegistro(){
 
   const linhasHtml = fatia.map(({ date, reg })=>{
     const estado = reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "";
-    const diaLabel = `${DIAS_SEMANA_ABR[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}`;
+    const diaLabel = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
+    const localizacao = reg.localizacao ? `<a href="https://www.google.com/maps?q=${reg.localizacao.lat},${reg.localizacao.lng}" target="_blank" rel="noopener" style="color:var(--primary-dark);font-size:11px;">Ver no mapa</a>` : `<span style="color:var(--muted);font-size:11px;">Não registrada</span>`;
     return `
       <div class="reg-row ${estado}">
         <span class="col-dia">${diaLabel}</span>
+        <span class="col-ponto">15:00</span>
         <span class="col-saida">${reg.saida}</span>
-        <span class="col-extra">${formatarExtra(reg.extraMin)}</span>
+        <span class="col-local">${localizacao}</span>
       </div>`;
   }).join("");
 
@@ -1521,12 +1552,12 @@ function mostrarDetalhe(key, date){
   }
 }
 
-document.getElementById("exportarBtn").addEventListener("click", exportarPlanilha);
+document.getElementById("exportarBtn").addEventListener("click", gerarImagem);
 
-function exportarPlanilha(){
+function gerarImagem(){
   const { start, end } = getPeriodBounds(registroAnchor);
   const registros = Store.getAll();
-  const linhas = [["Dia","Horário Ponto","Horário Saída","Tempo Extra"]];
+  const dados = [];
 
   for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
     const date = new Date(d);
@@ -1534,26 +1565,142 @@ function exportarPlanilha(){
     const reg = registros[key];
     if(!reg) continue;
     const diaLabel = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
-    linhas.push([diaLabel, "15:00", reg.saida, formatarExtra(reg.extraMin)]);
+    const localizacao = reg.localizacao ? `${reg.localizacao.lat.toFixed(5)}, ${reg.localizacao.lng.toFixed(5)}` : "Não registrada";
+    dados.push({ dia: diaLabel, ponto: "15:00", saida: reg.saida, localizacao, extra: formatarExtra(reg.extraMin), estado: reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "neutro" });
   }
 
-  if(linhas.length === 1){
-    alert("Sem registros no período para exportar.");
+  if(dados.length === 0){
+    alert("Sem registros no período para gerar imagem.");
     return;
   }
 
-  const csv = linhas.map(l => l.join(";")).join("\n");
-  const blob = new Blob(["﻿"+csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const nomeArquivo = `banco-horas_${fmtCurta(start).replace("/","-")}_a_${fmtCurta(end).replace("/","-")}-${end.getFullYear()}.csv`;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const padding = 24;
+  const rowH = 40;
+  const headerH = 48;
+  const titleH = 40;
+  const subtitleH = 24;
+  const cols = [
+    { key: "dia", label: "Dia", width: 0.35 },
+    { key: "ponto", label: "Ponto", width: 0.12 },
+    { key: "saida", label: "Saída", width: 0.15 },
+    { key: "localizacao", label: "Localização", width: 0.20 },
+    { key: "extra", label: "Extra", width: 0.18 },
+  ];
+  const totalW = 380;
+  canvas.width = totalW * dpr;
+  canvas.height = (titleH + subtitleH + headerH + dados.length * rowH + padding * 2) * dpr;
+  ctx.scale(dpr, dpr);
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = nomeArquivo;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Background
+  ctx.fillStyle = "#F7F5EE";
+  ctx.fillRect(0, 0, totalW, canvas.height / dpr);
+
+  // Title
+  ctx.fillStyle = "#20291A";
+  ctx.font = "bold 18px Georgia, serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Banco de Horas", totalW / 2, padding + 24);
+
+  // Subtitle
+  ctx.fillStyle = "#7A8570";
+  ctx.font = "12px -apple-system, sans-serif";
+  ctx.fillText(`${fmtCurta(start)} – ${fmtCurta(end)}/${end.getFullYear()}`, totalW / 2, padding + titleH + 14);
+
+  // Header
+  let y = padding + titleH + subtitleH;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(padding, y, totalW - padding * 2, headerH);
+  ctx.strokeStyle = "#ECEFE6";
+  ctx.strokeRect(padding, y, totalW - padding * 2, headerH);
+
+  let x = padding;
+  cols.forEach((col, i) => {
+    const colW = (totalW - padding * 2) * col.width;
+    ctx.fillStyle = "#4A701C";
+    ctx.font = "bold 11px -apple-system, sans-serif";
+    ctx.textAlign = i === 0 ? "left" : i === cols.length - 1 ? "right" : "center";
+    ctx.fillText(col.label, x + (i === 0 ? 8 : i === cols.length - 1 ? -8 : colW / 2), y + headerH / 2 + 4);
+    x += colW;
+  });
+
+  // Rows
+  y += headerH;
+  dados.forEach((row, idx) => {
+    const isEven = idx % 2 === 0;
+    const rowBg = isEven ? "#FFFFFF" : "#FAFBF8";
+    ctx.fillStyle = rowBg;
+    ctx.fillRect(padding, y, totalW - padding * 2, rowH);
+    ctx.strokeStyle = "#ECEFE6";
+    ctx.beginPath();
+    ctx.moveTo(padding, y + rowH);
+    ctx.lineTo(totalW - padding, y + rowH);
+    ctx.stroke();
+
+    x = padding;
+    cols.forEach((col, i) => {
+      const colW = (totalW - padding * 2) * col.width;
+      let val = row[col.key];
+      let color = "#20291A";
+      let font = "11px -apple-system, sans-serif";
+      let align = i === 0 ? "left" : i === cols.length - 1 ? "right" : "center";
+
+      if(col.key === "saida"){
+        if(row.estado === "positivo") color = "#375215";
+        else if(row.estado === "negativo") color = "#B3261E";
+        font = "bold 11px -apple-system, sans-serif";
+      }
+      if(col.key === "extra"){
+        if(row.estado === "positivo") color = "#4A701C";
+        else if(row.estado === "negativo") color = "#B3261E";
+        else color = "#7A8570";
+        font = "bold 11px -apple-system, sans-serif";
+      }
+      if(col.key === "localizacao" && val.length > 22){
+        val = val.substring(0, 20) + "...";
+      }
+
+      ctx.fillStyle = color;
+      ctx.font = font;
+      ctx.textAlign = align;
+      const textX = x + (i === 0 ? 8 : i === cols.length - 1 ? -8 : colW / 2);
+      ctx.fillText(val, textX, y + rowH / 2 + 4);
+      x += colW;
+    });
+    y += rowH;
+  });
+
+  // Footer - calculate actual total
+  const totalMin = dados.reduce((s, r) => {
+    const extra = r.extra;
+    const isNeg = extra.startsWith("-");
+    const clean = extra.replace(/[^\d]/g, "");
+    const h = parseInt(clean.slice(0, -2) || "0");
+    const m = parseInt(clean.slice(-2) || "0");
+    return s + (isNeg ? -1 : 1) * (h * 60 + m);
+  }, 0);
+  ctx.fillStyle = totalMin < 0 ? "#B3261E" : totalMin > 0 ? "#4A701C" : "#7A8570";
+  ctx.font = "bold 12px -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(`Saldo do período: ${formatarExtra(totalMin)}`, totalW / 2, y + 22);
+  ctx.fillStyle = "#7A8570";
+  ctx.font = "10px -apple-system, sans-serif";
+  ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, y + 40);
+
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const nomeArquivo = `banco-horas_${fmtCurta(start).replace("/","-")}_a_${fmtCurta(end).replace("/","-")}-${end.getFullYear()}.png`;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast("Imagem salva!");
+  }, "image/png");
 }
 
 function abrirImagem(base64){
