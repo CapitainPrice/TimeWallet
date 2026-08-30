@@ -26,7 +26,8 @@ jobs:
 
       - name: Create config.js from secret
         run: |
-          node -e "const config = ${{ secrets.FIREBASE_CONFIG }}; console.log('window.FIREBASE_CONFIG = ' + JSON.stringify(config) + ';');" > config.js
+          echo '${{ secrets.FIREBASE_CONFIG }}' > firebase-config.json
+          node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('firebase-config.json', 'utf8')); console.log('window.FIREBASE_CONFIG = ' + JSON.stringify(config) + ';');" > config.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
