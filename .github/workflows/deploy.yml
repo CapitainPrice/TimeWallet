@@ -26,7 +26,7 @@ jobs:
 
       - name: Create config.js from secret
         run: |
-          echo "window.FIREBASE_CONFIG = ${{ secrets.FIREBASE_CONFIG }};" > config.js
+          echo "${{ secrets.FIREBASE_CONFIG }}" | jq -r 'tojson' | sed 's/^/window.FIREBASE_CONFIG = /' | sed 's/$/;/' > config.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
