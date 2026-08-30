@@ -1,0 +1,1576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Banco de Horas</title>
+<style>
+  :root{
+    --primary:#4A701C;
+    --primary-dark:#375215;
+    --primary-light:#E8F0DD;
+    --bg:#F7F5EE;
+    --card:#FFFFFF;
+    --text:#20291A;
+    --muted:#7A8570;
+    --danger:#B3261E;
+    --radius:16px;
+    --shadow:0 2px 10px rgba(0,0,0,0.08);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{
+    max-width:480px;
+    margin:0 auto;
+    min-height:100vh;
+    background:var(--bg);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    box-shadow:-4px 0 20px rgba(0,0,0,0.2);
+  }
+
+  .top-bar{
+    background:var(--primary);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    padding:26px 20px;
+    border-radius:0 0 24px 24px;
+  }
+  .app-logo{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:32px;
+    height:32px;
+  }
+  .app-logo svg{width:22px;height:22px;stroke:#fff;}
+
+  .icon-btn{
+    background:rgba(255,255,255,0.18);
+    border:none;
+    border-radius:12px;
+    width:42px;
+    height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .icon-btn svg{width:22px;height:22px;stroke:#fff;}
+
+  .hero-wrap{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    padding:196px 22px 48px;
+    text-align:center;
+  }
+  .hero-greeting{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:28px;
+  }
+  .hero-icon svg{width:26px;height:26px;stroke:var(--primary);}
+  .hero-title{
+    font-family:Georgia,"Times New Roman",Cambria,serif;
+    font-size:23px;
+    font-weight:500;
+    margin:0;
+    color:var(--text);
+  }
+  .hero-card{
+    width:100%;
+    margin-top:48px;
+    background:var(--card);
+    border:1px solid rgba(0,0,0,0.08);
+    border-radius:26px;
+    padding:18px 20px;
+    box-shadow:0 4px 24px rgba(0,0,0,0.05);
+    text-align:left;
+  }
+  .hero-card .file-drop{border:none;background:transparent;padding:0;text-align:left;}
+  .hero-card .file-drop .ph{flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;min-height:34px;}
+  .hero-card .file-drop .ph svg{width:20px;height:20px;stroke:var(--muted);flex-shrink:0;}
+  .hero-card .file-drop img{max-height:180px;}
+  .done-status{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    color:var(--primary-dark);
+    font-weight:700;
+    font-size:14px;
+  }
+  .done-status svg{width:20px;height:20px;stroke:var(--primary);flex-shrink:0;}
+  .hero-card-bottom{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:16px;
+    padding-top:14px;
+    border-top:1px solid rgba(0,0,0,0.06);
+  }
+  .hero-card-tag{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    background:#B9A47C;
+    color:#fff;
+    font-size:13px;
+    font-weight:700;
+    padding:10px 16px;
+    border-radius:22px;
+    border:none;
+    box-shadow:0 3px 10px rgba(185,164,124,0.4);
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .hero-card-tag svg{width:14px;height:14px;stroke:#fff;flex-shrink:0;}
+  .hero-cam-btn{
+    width:44px;height:44px;
+    border-radius:50%;
+    background:#AEB49E;
+    border:none;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    box-shadow:0 3px 10px rgba(0,0,0,0.16);
+    flex-shrink:0;
+  }
+  .hero-cam-btn svg{width:19px;height:19px;stroke:var(--primary-dark);}
+
+  .sub-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 18px 0;
+  }
+  .sub-header-left{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .sub-header-cal{
+    width:38px;height:38px;
+    border-radius:50%;
+    background:var(--card);
+    border:1px solid rgba(0,0,0,0.08);
+    box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .sub-header-cal:active{background:var(--primary-light);}
+  .sub-header-cal svg{width:18px;height:18px;stroke:var(--primary-dark);}
+  .sub-header-date{
+    font-size:13px;
+    font-weight:600;
+    color:var(--muted);
+  }
+  .user-btn{
+    width:36px;height:36px;
+    border-radius:50%;
+    background:var(--primary-light);
+    border:none;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .user-btn svg{width:17px;height:17px;stroke:var(--primary-dark);}
+
+
+  .app-footer{
+    position:fixed;
+    left:50%;
+    bottom:0;
+    transform:translateX(-50%);
+    width:100%;
+    max-width:480px;
+    text-align:center;
+    font-size:11px;
+    color:var(--text);
+    padding:0 20px 20px;
+    background:var(--bg);
+    z-index:150;
+    pointer-events:none;
+  }
+
+
+  .day-badge{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .day-badge .dot{
+    width:10px;height:10px;border-radius:50%;background:var(--primary);
+  }
+  .day-badge span{font-weight:600;font-size:16px;}
+
+  label{
+    display:flex;
+    align-items:center;
+    font-size:13px;
+    font-weight:600;
+    color:var(--muted);
+    margin:14px 0 6px;
+  }
+  .label-ico{
+    display:inline-flex;
+    align-items:center;justify-content:center;
+    width:22px;height:22px;
+    border-radius:7px;
+    background:var(--primary-light);
+    margin-right:8px;
+    flex-shrink:0;
+  }
+  .label-ico svg{width:13px;height:13px;stroke:var(--primary-dark);}
+  label:first-of-type{margin-top:0;}
+
+  input[type="time"]{
+    width:100%;
+    padding:14px;
+    font-size:18px;
+    border:2px solid #E1E4DA;
+    border-radius:12px;
+    background:#FAFBF8;
+    color:var(--text);
+  }
+  input[type="time"]:focus{outline:none;border-color:var(--primary);}
+
+  .file-drop{
+    border:2px dashed #C9D3BB;
+    border-radius:12px;
+    padding:16px;
+    text-align:center;
+    background:#FAFBF8;
+  }
+  .file-actions{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+  }
+  .fa-btn{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    padding:10px;
+    border-radius:10px;
+    border:none;
+    background:var(--primary-light);
+    color:var(--primary-dark);
+    font-weight:600;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .fa-btn svg{width:15px;height:15px;stroke:var(--primary-dark);}
+  .geo-status{
+    margin-top:10px;
+    font-size:11px;
+    color:var(--muted);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+  }
+  .file-drop .ph{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    color:var(--muted);
+    font-size:13px;
+  }
+  .file-drop .ph svg{width:26px;height:26px;stroke:#B9C4AB;}
+  .file-drop img{
+    max-width:100%;
+    max-height:160px;
+    border-radius:8px;
+    display:block;
+    margin:0 auto;
+  }
+
+  .btn{
+    width:100%;
+    padding:15px;
+    background:var(--primary);
+    color:#fff;
+    border:none;
+    border-radius:12px;
+    font-size:16px;
+    font-weight:600;
+    margin-top:20px;
+    cursor:pointer;
+  }
+  .btn:active{background:var(--primary-dark);}
+  .btn:disabled{background:#B9C4AB;cursor:not-allowed;}
+
+  .toast{
+    position:fixed;
+    bottom:24px;
+    left:50%;
+    transform:translateX(-50%);
+    background:var(--primary-dark);
+    color:#fff;
+    padding:12px 20px;
+    border-radius:10px;
+    font-size:14px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s;
+    z-index:200;
+    white-space:nowrap;
+  }
+  .toast.show{opacity:1;}
+
+  /* Sidebar drawer */
+  .overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,0.35);
+    opacity:0;pointer-events:none;transition:opacity .25s;z-index:90;
+  }
+  .overlay.show{opacity:1;pointer-events:auto;}
+
+  .drawer{
+    position:fixed;
+    top:0;left:0;
+    height:100%;
+    width:100%;
+    max-width:480px;
+    background:var(--bg);
+    box-shadow:4px 0 20px rgba(0,0,0,0.2);
+    transform:translateX(-100%);
+    visibility:hidden;
+    transition:transform .28s ease, visibility 0s linear .28s;
+    z-index:100;
+    overflow-y:auto;
+  }
+  .drawer.show{
+    transform:translateX(0);
+    visibility:visible;
+    transition:transform .28s ease, visibility 0s linear 0s;
+  }
+
+  .drawer-head{
+    background:var(--primary);
+    color:#fff;
+    padding:18px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;top:0;
+    z-index:5;
+  }
+  .drawer-head h2{margin:0;font-size:16px;}
+
+  .drawer-body{padding:16px;}
+
+  .cal-heading{margin-bottom:52px;}
+  .cal-heading-date{
+    font-size:13px;
+    font-weight:600;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .reg-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 4px;
+    font-size:13px;
+    border-bottom:1px solid #ECEFE6;
+  }
+  .reg-row:last-child{border-bottom:none;}
+  .reg-row .col-dia{flex:1.3;font-weight:600;color:var(--text);}
+  .reg-row .col-saida{flex:1;color:var(--muted);}
+  .reg-row .col-extra{flex:1;text-align:right;font-weight:700;color:var(--muted);}
+  .reg-row.positivo .col-extra{color:var(--primary-dark);}
+  .reg-row.negativo .col-extra{color:var(--danger);}
+
+  .reg-paginacao{
+    display:flex;
+    justify-content:center;
+    gap:6px;
+    margin-top:12px;
+  }
+  .reg-pagina-btn{
+    width:28px;height:28px;
+    border-radius:8px;
+    border:none;
+    background:var(--bg);
+    color:var(--muted);
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .reg-pagina-btn.ativa{background:var(--primary);color:#fff;}
+
+  .cal-card{
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:16px;
+    box-shadow:var(--shadow);
+  }
+
+  .cal-nav{
+    display:flex;align-items:center;justify-content:space-between;
+    margin-bottom:12px;
+  }
+  .cal-nav .month{font-weight:700;font-size:15px;text-transform:capitalize;}
+  .cal-nav button{
+    background:var(--primary-light);
+    border:none;
+    width:34px;height:34px;
+    border-radius:8px;
+    color:var(--primary-dark);
+    font-size:16px;
+    cursor:pointer;
+  }
+
+  .cal-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:4px;
+  }
+  .cal-grid .wd{
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    font-weight:600;
+    padding-bottom:4px;
+  }
+  .cal-cell{
+    aspect-ratio:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:10px;
+    font-size:13px;
+    position:relative;
+    background:transparent;
+    color:var(--text);
+    cursor:pointer;
+    border:none;
+  }
+  .cal-cell.empty{visibility:hidden;cursor:default;}
+  .cal-cell.off{
+    color:#C7CDBC;
+    cursor:default;
+  }
+  .cal-cell.today{
+    background:var(--primary-light);
+    color:var(--primary-dark);
+    font-weight:800;
+    flex-direction:column;
+    gap:1px;
+    box-shadow: inset 0 0 0 2.5px var(--primary);
+  }
+  .cal-cell.today::after{
+    content:"hoje";
+    font-size:7px;
+    font-weight:700;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    line-height:1;
+  }
+  .cal-cell.filled.today{
+    color:#fff;
+    box-shadow: inset 0 0 0 2.5px #fff;
+  }
+  .cal-cell.filled{
+    background:var(--primary);
+    color:#fff;
+    font-weight:700;
+  }
+  .cal-cell.pending{border:2px solid var(--danger);}
+
+  .legend{
+    display:flex;
+    gap:8px;
+    margin-top:14px;
+    flex-wrap:wrap;
+  }
+  .legend span{
+    display:flex;align-items:center;gap:6px;
+    background:var(--bg);
+    padding:5px 10px;
+    border-radius:20px;
+    font-size:11px;
+    color:var(--muted);
+    font-weight:600;
+  }
+  .legend i{width:9px;height:9px;border-radius:3px;display:inline-block;flex-shrink:0;}
+
+  .btn-ico{display:inline-flex;vertical-align:middle;margin-right:6px;}
+  .btn-ico svg{width:16px;height:16px;}
+
+  .detail-card{
+    margin-top:16px;
+    background:var(--card);
+    border-radius:var(--radius);
+    padding:18px;
+    box-shadow:var(--shadow);
+  }
+  .empty-msg{color:var(--muted);font-size:13px;text-align:center;padding:20px 0;}
+  .back-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:var(--primary-light);
+    color:var(--primary-dark);
+    border:none;
+    border-radius:10px;
+    padding:9px 14px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    margin-bottom:14px;
+  }
+
+  .detail-day{display:flex;align-items:baseline;gap:8px;margin-bottom:16px;}
+  .detail-day-name{font-size:19px;font-weight:700;}
+  .detail-day-date{font-size:13px;color:var(--muted);}
+
+  .detail-hero{
+    background:var(--primary);
+    color:#fff;
+    border-radius:14px;
+    padding:16px;
+    text-align:center;
+    margin-bottom:16px;
+  }
+  .detail-hero .dh-label{font-size:11px;opacity:.85;text-transform:uppercase;letter-spacing:.5px;font-weight:600;}
+  .detail-hero.hero-muted{
+    background:#EFF1EA;
+    color:var(--text);
+  }
+  .detail-hero.hero-muted .dh-label{color:var(--muted);opacity:1;}
+  .detail-hero.hero-muted .dh-value{color:var(--primary-dark);}
+  .detail-hero .dh-value{font-size:30px;font-weight:700;margin-top:4px;}
+
+  .detail-info{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+  .di-row{
+    display:flex;align-items:center;gap:12px;
+    background:#FAFBF8;
+    border-radius:12px;
+    padding:11px 12px;
+  }
+  .di-icon{
+    width:36px;height:36px;border-radius:10px;
+    background:var(--primary-light);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .di-icon svg{width:18px;height:18px;stroke:var(--primary-dark);}
+  .di-text{display:flex;flex-direction:column;flex:1;min-width:0;}
+  .di-k{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;}
+  .di-v{font-size:16px;font-weight:700;color:var(--text);}
+
+  .detail-anexo{background:#FAFBF8;border-radius:12px;padding:12px;}
+  .da-head{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:10px;}
+  .da-body{display:flex;gap:12px;align-items:center;}
+  .da-thumb{
+    width:56px;height:56px;
+    object-fit:cover;
+    border-radius:10px;
+    cursor:pointer;
+    flex-shrink:0;
+    background:#E1E4DA;
+  }
+  .da-info{flex:1;min-width:0;}
+  .da-nome{
+    font-size:13px;font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    margin-bottom:8px;
+  }
+  .da-actions{display:flex;gap:8px;}
+  .da-btn{
+    flex:1;text-align:center;
+    padding:9px;border-radius:9px;
+    font-size:12px;font-weight:600;
+    border:none;cursor:pointer;
+    text-decoration:none;
+  }
+  #anexoVer{background:var(--primary-light);color:var(--primary-dark);}
+  #anexoDownload{background:var(--primary);color:#fff;}
+
+  .cam-modal{
+    position:fixed;inset:0;
+    background:#000;
+    display:flex;flex-direction:column;
+    z-index:310;
+    opacity:0;pointer-events:none;
+    transition:opacity .2s;
+  }
+  .cam-modal.show{opacity:1;pointer-events:auto;}
+  .cam-modal video, .cam-modal img{flex:1;width:100%;min-height:0;object-fit:cover;background:#000;}
+  .cam-question{
+    color:#fff;
+    text-align:center;
+    font-size:14px;
+    font-weight:600;
+    padding:14px 16px 0;
+    background:#000;
+  }
+  .cam-actions{display:flex;gap:10px;padding:16px;background:#000;padding-bottom:max(16px, env(safe-area-inset-bottom));}
+  .cam-actions .fa-btn{background:rgba(255,255,255,0.15);color:#fff;flex:1;}
+  .cam-actions .btn{flex:2;}
+
+  .img-modal{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.9);
+    display:flex;align-items:center;justify-content:center;
+    z-index:300;
+    opacity:0;pointer-events:none;
+    transition:opacity .2s;
+  }
+  .img-modal.show{opacity:1;pointer-events:auto;}
+  .img-modal img{max-width:92%;max-height:80%;border-radius:8px;}
+  .img-modal .icon-btn{
+    position:absolute;top:18px;right:18px;
+    background:rgba(255,255,255,0.15);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="top-bar">
+    <span class="app-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg>
+    </span>
+  </div>
+
+  <div class="sub-header">
+    <div class="sub-header-left">
+      <button class="sub-header-cal" id="pillCalendario" type="button" aria-label="Abrir calendário">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      </button>
+      <span class="sub-header-date" id="dataPrincipal">—</span>
+    </div>
+    <button class="user-btn" id="btnUsuario" type="button" aria-label="Usuário">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+    </button>
+  </div>
+
+  <main class="hero-wrap">
+    <div class="hero-greeting">
+      <span class="hero-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"></path>
+        </svg>
+      </span>
+      <h1 class="hero-title" id="saudacaoPrincipal">—</h1>
+    </div>
+
+    <div class="hero-card">
+      <input type="hidden" id="saida">
+
+      <div class="file-drop" id="fileDrop">
+        <div class="ph" id="filePh">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span>Nenhum registro de saída hoje ainda</span>
+        </div>
+        <img id="fileImg" style="display:none;">
+        <div class="done-status" id="doneStatus" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5L16 9"></path></svg>
+          <span>Registro realizado</span>
+        </div>
+
+        <div class="detail-hero hero-muted" id="resultBox" style="margin-top:20px;">
+          <div class="dh-label">Tempo extra</div>
+          <div class="dh-value" id="tempoExtra">—</div>
+          <div style="font-size:12px;opacity:.85;margin-top:6px;" id="horarioCapturado">Aguardando registro de hoje</div>
+        </div>
+        <div class="geo-status" id="geoStatus" style="display:none;"></div>
+        <input type="file" id="comprovanteCamera" accept="image/*" capture="environment" hidden>
+      </div>
+
+      <div class="hero-card-bottom">
+        <button type="button" class="hero-card-tag" id="btnRegistro">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg>
+          Banco de Horas
+        </button>
+        <button type="button" class="hero-cam-btn" id="btnCamera" aria-label="Tirar foto">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <div class="app-footer">Desenvolvido por Guilherme Gonçalves.</div>
+
+  <div class="toast" id="toast">Salvo!</div>
+
+  <div class="cam-modal" id="camModal">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <img id="camPreview" style="display:none;">
+    <div class="cam-question" id="camQuestion" style="display:none;">Foto ficou boa?</div>
+    <div class="cam-actions" id="camActionsLive">
+      <button class="fa-btn cam-cancel" id="camCancelar" type="button">Cancelar</button>
+      <button class="btn" id="camCapturar" type="button" style="margin-top:0;">Capturar foto</button>
+    </div>
+    <div class="cam-actions" id="camActionsPreview" style="display:none;">
+      <button class="fa-btn cam-cancel" id="camMudar" type="button">Mudar</button>
+      <button class="btn" id="camFeito" type="button" style="margin-top:0;">Feito!</button>
+    </div>
+  </div>
+  <canvas id="camCanvas" style="display:none;"></canvas>
+
+  <div class="img-modal" id="imgModal">
+    <button class="icon-btn" id="closeImgModal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+    <img id="imgModalPic" alt="Comprovante">
+  </div>
+
+  <div class="overlay" id="registroOverlay"></div>
+  <div class="drawer" id="registroScreen">
+    <div class="drawer-head">
+      <span class="app-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg>
+      </span>
+      <button class="icon-btn" id="closeRegistro" style="width:34px;height:34px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <div class="cal-heading">
+        <div class="hero-greeting" style="margin-bottom:4px;">
+          <span class="hero-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg>
+          </span>
+          <h2 class="hero-title">Banco de Horas</h2>
+        </div>
+        <div class="cal-heading-date" id="registroPeriodo">—</div>
+      </div>
+
+      <div class="detail-hero hero-muted" id="registroHero">
+        <div class="dh-label">Saldo do período</div>
+        <div class="dh-value" id="registroSaldo">0min</div>
+      </div>
+
+      <div class="cal-card" style="margin-top:24px;">
+        <div class="cal-nav">
+          <button id="regPrevPeriod">‹</button>
+          <div class="month" id="regPeriodoLabel">—</div>
+          <button id="regNextPeriod">›</button>
+        </div>
+        <div class="reg-tabela" id="regTabela"></div>
+        <div class="reg-paginacao" id="regPaginacao"></div>
+      </div>
+
+      <button class="btn" id="exportarBtn" style="margin-top:16px;">
+        <span class="btn-ico">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+        </span>
+        Exportar planilha
+      </button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div class="drawer" id="drawer">
+    <div class="drawer-head">
+      <span class="app-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3.5 2"></path></svg>
+      </span>
+      <button class="icon-btn" id="closeDrawer" style="width:34px;height:34px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <div id="calendarView">
+        <div class="cal-heading">
+          <div class="hero-greeting" style="margin-bottom:4px;">
+            <span class="hero-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            </span>
+            <h2 class="hero-title">Calendário</h2>
+          </div>
+          <div class="cal-heading-date" id="calHeadingData">—</div>
+        </div>
+
+        <div class="cal-card">
+          <div class="cal-nav">
+            <button id="prevMonth">‹</button>
+            <div class="month" id="monthLabel">—</div>
+            <button id="nextMonth">›</button>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div class="legend">
+            <span><i style="background:var(--primary)"></i>Preenchido</span>
+            <span><i style="background:var(--primary-light);box-shadow:inset 0 0 0 2px var(--primary);"></i>Hoje</span>
+            <span><i style="background:#C7CDBC"></i>Fim de semana / feriado</span>
+            <span><i style="background:#fff;border:2px solid var(--danger);"></i>Sem registro</span>
+          </div>
+        </div>
+
+        <div class="detail-hero hero-muted" style="margin-top:16px;">
+          <div class="dh-label" id="totalLabel">Tempo extra total</div>
+          <div class="dh-value" id="totalExtra">0min</div>
+        </div>
+      </div>
+      <div id="detailView" style="display:none;">
+        <button class="back-btn" id="backToCalendar">‹ Voltar ao calendário</button>
+        <div id="detailArea"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- Config ---------- */
+const PONTO_MINUTOS = 15 * 60; // 15:00 fixo
+const TOLERANCIA_MINUTOS = 15 * 60 + 10; // 15:10 (tolerância até 15:10:59)
+const STORAGE_KEY = "bancoHoras_registros"; // { "YYYY-MM-DD": { saida, extraMin, comprovante } }
+
+const DIAS_SEMANA = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+const DIAS_SEMANA_ABR = ["D","S","T","Q","Q","S","S"];
+const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+
+/* ---------- Storage layer (troca fácil por Firebase depois) ---------- */
+const Store = {
+  getAll(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch(e){ return {}; }
+  },
+  get(dateKey){ return this.getAll()[dateKey] || null; },
+  set(dateKey, data){
+    const all = this.getAll();
+    all[dateKey] = data;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
+};
+
+/* ---------- Feriados nacionais (fixos + móveis via Páscoa) ---------- */
+function calcularPascoa(year){
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15) % 30;
+  const i = Math.floor(c/4), k = c % 4, l = (32+2*e+2*i-h-k) % 7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const mes = Math.floor((h+l-7*m+114)/31);
+  const dia = ((h+l-7*m+114) % 31) + 1;
+  return new Date(year, mes-1, dia);
+}
+function addDias(date, dias){
+  const d = new Date(date);
+  d.setDate(d.getDate()+dias);
+  return d;
+}
+function toKey(d){
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+const feriadosCache = {};
+function feriadosDoAno(year){
+  if(feriadosCache[year]) return feriadosCache[year];
+  const pascoa = calcularPascoa(year);
+  const set = new Set([
+    `${year}-01-01`, // Confraternização Universal
+    `${year}-04-21`, // Tiradentes
+    `${year}-05-01`, // Dia do Trabalho
+    `${year}-09-07`, // Independência
+    `${year}-10-12`, // Nossa Senhora Aparecida
+    `${year}-11-02`, // Finados
+    `${year}-11-15`, // Proclamação da República
+    `${year}-11-20`, // Consciência Negra (nacional desde 2024)
+    `${year}-12-25`, // Natal
+    toKey(addDias(pascoa,-48)), // Carnaval (segunda)
+    toKey(addDias(pascoa,-47)), // Carnaval (terça)
+    toKey(addDias(pascoa,-2)),  // Sexta-feira Santa
+    toKey(addDias(pascoa,60)),  // Corpus Christi
+  ]);
+  feriadosCache[year] = set;
+  return set;
+}
+function isDiaUtil(date){
+  const dow = date.getDay(); // 0 dom, 6 sab
+  if(dow===0 || dow===6) return false;
+  if(feriadosDoAno(date.getFullYear()).has(toKey(date))) return false;
+  return true;
+}
+
+/* ---------- Tempo extra ---------- */
+function calcularExtra(saidaStr){
+  const [h,m] = saidaStr.split(":").map(Number);
+  const saidaMin = h*60+m;
+  if(saidaMin < PONTO_MINUTOS) return saidaMin - PONTO_MINUTOS;
+  if(saidaMin <= TOLERANCIA_MINUTOS) return 0;
+  return saidaMin - TOLERANCIA_MINUTOS;
+}
+function formatarExtra(min){
+  const sinal = min < 0 ? "-" : "";
+  const abs = Math.abs(min);
+  if(abs < 60) return `${sinal}${abs}min`;
+  const h = Math.floor(abs/60);
+  const m = abs % 60;
+  return `${sinal}${h}h${String(m).padStart(2,"0")}min`;
+}
+
+/* ---------- Tela principal ---------- */
+const hoje = new Date();
+const hojeKey = toKey(hoje);
+
+const NOME_KEY = "bancoHoras_nome";
+
+function obterNomeUsuario(){
+  let nome = localStorage.getItem(NOME_KEY);
+  if(nome === null){
+    nome = (prompt("Como podemos te chamar?") || "").trim();
+    localStorage.setItem(NOME_KEY, nome);
+  }
+  return nome;
+}
+
+const FRASES_SAUDACAO = {
+  manha: [
+    n => `Bom dia${n}! Pronto para registrar seu dia?`,
+    n => `Bom dia${n}! Vamos conferir suas horas de hoje.`,
+    n => `Bom dia${n}! Bora começar com o ponto em dia.`,
+    n => `Bom dia${n}! Já pode bater o registro quando sair.`,
+  ],
+  tarde: [
+    n => `Boa tarde${n}! Seguindo firme no expediente.`,
+    n => `Boa tarde${n}! Não esqueça de registrar sua saída.`,
+    n => `Boa tarde${n}! Vamos fechar o dia certinho.`,
+    n => `Boa tarde${n}! Falta pouco para o registro de hoje.`,
+  ],
+  noite: [
+    n => `Boa noite${n}! Hora de registrar sua saída.`,
+    n => `Boa noite${n}! Vamos fechar o expediente de hoje.`,
+    n => `Boa noite${n}! Vamos conferir seu tempo extra.`,
+    n => `Boa noite${n}! Já pode tirar a foto do comprovante.`,
+  ],
+};
+
+function periodoDoDia(hora){
+  if(hora < 12) return "manha";
+  if(hora < 18) return "tarde";
+  return "noite";
+}
+
+function renderCabecalho(){
+  const nomeRaw = obterNomeUsuario();
+  const nomeTexto = nomeRaw ? `, ${nomeRaw}` : "";
+  const lista = FRASES_SAUDACAO[periodoDoDia(hoje.getHours())];
+  const diaDoAno = Math.floor((hoje - new Date(hoje.getFullYear(), 0, 0)) / 86400000);
+  const frase = lista[diaDoAno % lista.length](nomeTexto);
+
+  document.getElementById("saudacaoPrincipal").textContent = frase;
+  document.getElementById("dataPrincipal").textContent =
+    `${DIAS_SEMANA[hoje.getDay()]}, ${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;
+}
+
+let comprovanteBase64 = null;
+let comprovanteNome = null;
+let comprovanteLocalizacao = null;
+
+function carregarRegistroHoje(){
+  const reg = Store.get(hojeKey);
+  if(reg){
+    document.getElementById("saida").value = reg.saida;
+    comprovanteBase64 = reg.comprovante || null;
+    comprovanteNome = reg.comprovanteNome || null;
+    comprovanteLocalizacao = reg.localizacao || null;
+    if(comprovanteBase64){
+      exibirComprovante(comprovanteBase64);
+    }
+    if(comprovanteLocalizacao){
+      exibirStatusGeo(`Localização registrada (${comprovanteLocalizacao.lat.toFixed(5)}, ${comprovanteLocalizacao.lng.toFixed(5)})`);
+    }
+    mostrarResultado(reg.extraMin);
+  }
+}
+
+function exibirComprovante(base64){
+  document.getElementById("fileImg").src = base64;
+  document.getElementById("filePh").style.display = "none";
+  document.getElementById("doneStatus").style.display = "flex";
+}
+
+function exibirStatusGeo(texto){
+  const el = document.getElementById("geoStatus");
+  el.style.display = "flex";
+  el.textContent = texto;
+}
+
+function preencherHorarioAtual(){
+  const agora = new Date();
+  const hh = String(agora.getHours()).padStart(2,"0");
+  const mm = String(agora.getMinutes()).padStart(2,"0");
+  document.getElementById("saida").value = `${hh}:${mm}`;
+}
+
+function capturarLocalizacao(){
+  if(!navigator.geolocation){
+    exibirStatusGeo("Localização não suportada neste dispositivo");
+    return;
+  }
+  exibirStatusGeo("Obtendo localização...");
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      comprovanteLocalizacao = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      exibirStatusGeo(`Localização registrada (${comprovanteLocalizacao.lat.toFixed(5)}, ${comprovanteLocalizacao.lng.toFixed(5)})`);
+      salvarRegistroHoje();
+    },
+    ()=>{
+      comprovanteLocalizacao = null;
+      exibirStatusGeo("Não foi possível obter a localização");
+    },
+    { enableHighAccuracy:true, timeout:8000 }
+  );
+}
+
+function mostrarResultado(min){
+  const box = document.getElementById("resultBox");
+  if(min === 0){
+    box.classList.add("hero-muted");
+    box.style.background = "";
+  } else {
+    box.classList.remove("hero-muted");
+    box.style.background = min < 0 ? "var(--danger)" : "var(--primary)";
+  }
+  document.getElementById("tempoExtra").textContent = formatarExtra(min);
+  document.getElementById("horarioCapturado").textContent = `Saída registrada às ${document.getElementById("saida").value}`;
+}
+
+function salvarRegistroHoje(){
+  const saida = document.getElementById("saida").value;
+  if(!saida || !comprovanteBase64) return false;
+  const extraMin = calcularExtra(saida);
+  Store.set(hojeKey, { saida, extraMin, comprovante: comprovanteBase64, comprovanteNome, localizacao: comprovanteLocalizacao });
+  mostrarResultado(extraMin);
+  renderCalendario();
+  return true;
+}
+
+function processarArquivo(file){
+  comprovanteNome = file.name;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    comprovanteBase64 = reader.result;
+    exibirComprovante(comprovanteBase64);
+    preencherHorarioAtual();
+    salvarRegistroHoje();
+    mostrarToast("Registro salvo automaticamente!");
+    capturarLocalizacao();
+  };
+  reader.readAsDataURL(file);
+}
+
+let camStream = null;
+
+async function abrirCamera(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    document.getElementById("comprovanteCamera").click();
+    return;
+  }
+  try{
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+  }catch(err){
+    document.getElementById("comprovanteCamera").click();
+    return;
+  }
+  const video = document.getElementById("camVideo");
+  video.srcObject = camStream;
+  mostrarLiveCamera();
+  document.getElementById("camModal").classList.add("show");
+}
+
+let fotoCapturada = null;
+
+function mostrarLiveCamera(){
+  document.getElementById("camVideo").style.display = "block";
+  document.getElementById("camPreview").style.display = "none";
+  document.getElementById("camQuestion").style.display = "none";
+  document.getElementById("camActionsLive").style.display = "flex";
+  document.getElementById("camActionsPreview").style.display = "none";
+}
+
+function fecharCamera(){
+  document.getElementById("camModal").classList.remove("show");
+  if(camStream){
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null;
+  }
+  fotoCapturada = null;
+  mostrarLiveCamera();
+}
+
+function capturarFoto(){
+  const video = document.getElementById("camVideo");
+  const canvas = document.getElementById("camCanvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  fotoCapturada = canvas.toDataURL("image/jpeg", 0.85);
+
+  document.getElementById("camPreview").src = fotoCapturada;
+  document.getElementById("camVideo").style.display = "none";
+  document.getElementById("camPreview").style.display = "block";
+  document.getElementById("camQuestion").style.display = "block";
+  document.getElementById("camActionsLive").style.display = "none";
+  document.getElementById("camActionsPreview").style.display = "flex";
+}
+
+function confirmarFoto(){
+  const foto = fotoCapturada;
+  fecharCamera();
+  comprovanteNome = `foto_${Date.now()}.jpg`;
+  comprovanteBase64 = foto;
+  exibirComprovante(comprovanteBase64);
+  preencherHorarioAtual();
+  salvarRegistroHoje();
+  mostrarToast("Registro salvo automaticamente!");
+  capturarLocalizacao();
+}
+
+let registroAnchor = hoje.getDate() <= 25
+  ? new Date(hoje.getFullYear(), hoje.getMonth()-1, 1)
+  : new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+const REG_POR_PAGINA = 8;
+let regDadosPeriodo = [];
+let regPaginaAtual = 1;
+
+function renderRegistro(){
+  const { start, end } = getPeriodBounds(registroAnchor);
+  document.getElementById("regPeriodoLabel").textContent = `${fmtCurta(start)} – ${fmtCurta(end)}/${end.getFullYear()}`;
+
+  const registros = Store.getAll();
+  let totalMin = 0;
+  regDadosPeriodo = [];
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+    const date = new Date(d);
+    const reg = registros[toKey(date)];
+    if(!reg) continue;
+    totalMin += reg.extraMin;
+    regDadosPeriodo.push({ date, reg });
+  }
+
+  const saldoEl = document.getElementById("registroSaldo");
+  saldoEl.textContent = formatarExtra(totalMin);
+  saldoEl.style.color = totalMin < 0 ? "var(--danger)" : totalMin > 0 ? "var(--primary)" : "";
+
+  document.getElementById("registroPeriodo").textContent =
+    `${DIAS_SEMANA[hoje.getDay()]}, ${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;
+
+  regPaginaAtual = 1;
+  renderPaginaRegistro();
+}
+
+function renderPaginaRegistro(){
+  const totalPaginas = Math.max(1, Math.ceil(regDadosPeriodo.length / REG_POR_PAGINA));
+  if(regPaginaAtual > totalPaginas) regPaginaAtual = totalPaginas;
+
+  const inicio = (regPaginaAtual-1) * REG_POR_PAGINA;
+  const fatia = regDadosPeriodo.slice(inicio, inicio + REG_POR_PAGINA);
+
+  const linhasHtml = fatia.map(({ date, reg })=>{
+    const estado = reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "";
+    const diaLabel = `${DIAS_SEMANA_ABR[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}`;
+    return `
+      <div class="reg-row ${estado}">
+        <span class="col-dia">${diaLabel}</span>
+        <span class="col-saida">${reg.saida}</span>
+        <span class="col-extra">${formatarExtra(reg.extraMin)}</span>
+      </div>`;
+  }).join("");
+
+  document.getElementById("regTabela").innerHTML =
+    linhasHtml || `<div class="empty-msg">Sem registros neste período.</div>`;
+
+  const pagBox = document.getElementById("regPaginacao");
+  if(totalPaginas <= 1){
+    pagBox.innerHTML = "";
+  } else {
+    let botoes = "";
+    for(let p=1; p<=totalPaginas; p++){
+      botoes += `<button type="button" class="reg-pagina-btn ${p===regPaginaAtual?'ativa':''}" data-pagina="${p}">${p}</button>`;
+    }
+    pagBox.innerHTML = botoes;
+    pagBox.querySelectorAll(".reg-pagina-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        regPaginaAtual = Number(btn.dataset.pagina);
+        renderPaginaRegistro();
+      });
+    });
+  }
+}
+
+function abrirRegistro(){
+  renderRegistro();
+  document.getElementById("registroScreen").classList.add("show");
+  document.getElementById("registroOverlay").classList.add("show");
+}
+function fecharRegistro(){
+  document.getElementById("registroScreen").classList.remove("show");
+  document.getElementById("registroOverlay").classList.remove("show");
+}
+document.getElementById("btnRegistro").addEventListener("click", abrirRegistro);
+document.getElementById("closeRegistro").addEventListener("click", fecharRegistro);
+document.getElementById("registroOverlay").addEventListener("click", fecharRegistro);
+document.getElementById("regPrevPeriod").addEventListener("click", ()=>{
+  registroAnchor.setMonth(registroAnchor.getMonth()-1);
+  renderRegistro();
+});
+document.getElementById("regNextPeriod").addEventListener("click", ()=>{
+  registroAnchor.setMonth(registroAnchor.getMonth()+1);
+  renderRegistro();
+});
+
+document.getElementById("btnCamera").addEventListener("click", abrirCamera);
+document.getElementById("camCancelar").addEventListener("click", fecharCamera);
+document.getElementById("camCapturar").addEventListener("click", capturarFoto);
+document.getElementById("camMudar").addEventListener("click", mostrarLiveCamera);
+document.getElementById("camFeito").addEventListener("click", confirmarFoto);
+document.getElementById("comprovanteCamera").addEventListener("change", (e)=>{
+  const file = e.target.files[0];
+  if(file) processarArquivo(file);
+  e.target.value = "";
+});
+
+function mostrarToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 1800);
+}
+
+/* ---------- Drawer / Calendário (período 26 -> 25) ---------- */
+// periodAnchor: 1o dia do mês cujo dia 26 é o INÍCIO do período exibido.
+// período = [ (anchorYear, anchorMonth, 26) .. (anchorYear, anchorMonth+1, 25) ]
+let periodAnchor = hoje.getDate() <= 25
+  ? new Date(hoje.getFullYear(), hoje.getMonth()-1, 1)
+  : new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+function getPeriodBounds(anchor){
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), 26);
+  const end = new Date(anchor.getFullYear(), anchor.getMonth()+1, 25);
+  return { start, end };
+}
+
+function mostrarViewCalendario(){
+  document.getElementById("calendarView").style.display = "block";
+  document.getElementById("detailView").style.display = "none";
+}
+function mostrarViewDetalhe(){
+  document.getElementById("calendarView").style.display = "none";
+  document.getElementById("detailView").style.display = "block";
+}
+
+function renderSaudacao(){
+  const dataFmt = `${DIAS_SEMANA[hoje.getDay()]}, ${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;
+  document.getElementById("calHeadingData").textContent = dataFmt;
+}
+
+function abrirDrawer(){
+  document.getElementById("drawer").classList.add("show");
+  document.getElementById("overlay").classList.add("show");
+  mostrarViewCalendario();
+  renderSaudacao();
+  renderCalendario();
+}
+function fecharDrawer(){
+  document.getElementById("drawer").classList.remove("show");
+  document.getElementById("overlay").classList.remove("show");
+  document.getElementById("detailArea").innerHTML = "";
+  mostrarViewCalendario();
+}
+document.getElementById("pillCalendario").addEventListener("click", abrirDrawer);
+document.getElementById("btnUsuario").addEventListener("click", ()=>{
+  mostrarToast("Em breve!");
+});
+
+document.getElementById("closeDrawer").addEventListener("click", fecharDrawer);
+document.getElementById("overlay").addEventListener("click", fecharDrawer);
+document.getElementById("backToCalendar").addEventListener("click", mostrarViewCalendario);
+document.getElementById("prevMonth").addEventListener("click", ()=>{
+  periodAnchor.setMonth(periodAnchor.getMonth()-1);
+  renderCalendario();
+});
+document.getElementById("nextMonth").addEventListener("click", ()=>{
+  periodAnchor.setMonth(periodAnchor.getMonth()+1);
+  renderCalendario();
+});
+
+function fmtCurta(d){
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+
+function renderCalendario(){
+  const { start, end } = getPeriodBounds(periodAnchor);
+  document.getElementById("monthLabel").textContent = `${fmtCurta(start)} – ${fmtCurta(end)}/${end.getFullYear()}`;
+
+  const grid = document.getElementById("calGrid");
+  grid.innerHTML = "";
+  DIAS_SEMANA_ABR.forEach(d=>{
+    const el = document.createElement("div");
+    el.className = "wd";
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const registros = Store.getAll();
+  const firstDow = start.getDay();
+  for(let i=0;i<firstDow;i++){
+    const el = document.createElement("div");
+    el.className = "cal-cell empty";
+    grid.appendChild(el);
+  }
+
+  let totalMin = 0;
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+    const date = new Date(d);
+    const key = toKey(date);
+    const util = isDiaUtil(date);
+    const reg = registros[key];
+    const btn = document.createElement("button");
+    btn.className = "cal-cell";
+    if(!util) btn.className += " off";
+    if(key === hojeKey) btn.className += " today";
+    if(reg) btn.className += " filled";
+    if(util && !reg && key <= hojeKey) btn.className += " pending";
+    btn.textContent = date.getDate();
+    if(util){
+      btn.addEventListener("click", ()=> mostrarDetalhe(key, date));
+    }
+    grid.appendChild(btn);
+    if(reg) totalMin += reg.extraMin;
+  }
+
+  document.getElementById("totalExtra").textContent = formatarExtra(totalMin);
+  document.getElementById("totalLabel").textContent = `Tempo extra total no período (${MESES[end.getMonth()]})`;
+}
+
+function renderFormManual(key, date, dataFmt){
+  const area = document.getElementById("detailArea");
+  const [diaNome, diaData] = dataFmt.split(" ");
+  let manualBase64 = null;
+  let manualNome = null;
+
+  area.innerHTML = `
+    <div class="detail-card">
+      <div class="detail-day">
+        <span class="detail-day-name">${diaNome}</span>
+        <span class="detail-day-date">${diaData}</span>
+      </div>
+      <div class="empty-msg" style="padding:0 0 16px;text-align:left;">Sem registro neste dia. Preencha manualmente:</div>
+
+      <label for="saidaManual">
+        <span class="label-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg></span>
+        Horário Saída
+      </label>
+      <input type="time" id="saidaManual">
+
+      <label>
+        <span class="label-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></span>
+        Comprovante
+      </label>
+      <div class="file-drop" id="fileDropManual">
+        <div class="ph" id="filePhManual">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span>Nenhuma foto anexada</span>
+        </div>
+        <img id="fileImgManual" style="display:none;">
+        <div class="file-actions">
+          <button type="button" class="fa-btn" id="btnGaleriaManual" style="flex:1;">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="M21 15l-5-5L5 21"></path></svg>
+            Galeria
+          </button>
+        </div>
+        <input type="file" id="comprovanteGaleriaManual" accept="image/*" hidden>
+      </div>
+
+      <button class="btn" id="salvarManual">Salvar registro</button>
+    </div>
+  `;
+
+  document.getElementById("btnGaleriaManual").addEventListener("click", ()=>{
+    document.getElementById("comprovanteGaleriaManual").click();
+  });
+  document.getElementById("comprovanteGaleriaManual").addEventListener("change", (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    manualNome = file.name;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      manualBase64 = reader.result;
+      const img = document.getElementById("fileImgManual");
+      const ph = document.getElementById("filePhManual");
+      img.src = manualBase64;
+      img.style.display = "block";
+      ph.style.display = "none";
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  });
+
+  document.getElementById("salvarManual").addEventListener("click", ()=>{
+    const saida = document.getElementById("saidaManual").value;
+    if(!saida){
+      alert("Preencha o horário de saída.");
+      return;
+    }
+    if(!manualBase64){
+      alert("Anexe o comprovante.");
+      return;
+    }
+    const extraMin = calcularExtra(saida);
+    Store.set(key, { saida, extraMin, comprovante: manualBase64, comprovanteNome: manualNome, localizacao: null });
+    mostrarToast("Registro salvo!");
+    if(key === hojeKey) carregarRegistroHoje();
+    renderCalendario();
+    mostrarDetalhe(key, date);
+  });
+}
+
+function mostrarDetalhe(key, date){
+  mostrarViewDetalhe();
+  const reg = Store.get(key);
+  const area = document.getElementById("detailArea");
+  const dataFmt = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
+  if(!reg){
+    if(key > hojeKey){
+      area.innerHTML = `<div class="detail-card"><div class="empty-msg">Esse dia ainda não chegou.</div></div>`;
+      return;
+    }
+    renderFormManual(key, date, dataFmt);
+    return;
+  }
+  const nome = reg.comprovanteNome || "comprovante.jpg";
+  const [diaNome, diaData] = dataFmt.split(" ");
+  const heroClass = reg.extraMin === 0 ? "detail-hero hero-muted" : "detail-hero";
+  const heroBg = reg.extraMin === 0 ? "" : `background:${reg.extraMin < 0 ? 'var(--danger)' : 'var(--primary)'};`;
+  area.innerHTML = `
+    <div class="detail-card">
+      <div class="detail-day">
+        <span class="detail-day-name">${diaNome}</span>
+        <span class="detail-day-date">${diaData}</span>
+      </div>
+
+      <div class="${heroClass}" style="${heroBg}">
+        <div class="dh-label">Tempo extra</div>
+        <div class="dh-value">${formatarExtra(reg.extraMin)}</div>
+      </div>
+
+      <div class="detail-info">
+        <div class="di-row">
+          <div class="di-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+          </div>
+          <div class="di-text"><span class="di-k">Horário de ponto</span><span class="di-v">15:00</span></div>
+        </div>
+        <div class="di-row">
+          <div class="di-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+          </div>
+          <div class="di-text"><span class="di-k">Horário de saída</span><span class="di-v">${reg.saida}</span></div>
+        </div>
+        <div class="di-row">
+          <div class="di-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          </div>
+          <div class="di-text"><span class="di-k">Localização</span><span class="di-v">${reg.localizacao ? `<a href="https://www.google.com/maps?q=${reg.localizacao.lat},${reg.localizacao.lng}" target="_blank" rel="noopener" style="color:var(--primary-dark);">Ver no mapa</a>` : "Não registrada"}</span></div>
+        </div>
+      </div>
+
+      <div class="detail-anexo">
+        <div class="da-head">Comprovante</div>
+        <div class="da-body">
+          <img class="da-thumb" id="anexoThumb" src="${reg.comprovante || ""}" alt="Comprovante">
+          <div class="da-info">
+            <div class="da-nome">${nome}</div>
+            <div class="da-actions">
+              <button class="da-btn" id="anexoVer" type="button">Visualizar</button>
+              <a class="da-btn" id="anexoDownload">Baixar</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  if(reg.comprovante){
+    document.getElementById("anexoThumb").addEventListener("click", ()=> abrirImagem(reg.comprovante));
+    document.getElementById("anexoVer").addEventListener("click", ()=> abrirImagem(reg.comprovante));
+    const dl = document.getElementById("anexoDownload");
+    dl.href = reg.comprovante;
+    dl.setAttribute("download", nome);
+  }
+}
+
+document.getElementById("exportarBtn").addEventListener("click", exportarPlanilha);
+
+function exportarPlanilha(){
+  const { start, end } = getPeriodBounds(registroAnchor);
+  const registros = Store.getAll();
+  const linhas = [["Dia","Horário Ponto","Horário Saída","Tempo Extra"]];
+
+  for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
+    const date = new Date(d);
+    const key = toKey(date);
+    const reg = registros[key];
+    if(!reg) continue;
+    const diaLabel = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
+    linhas.push([diaLabel, "15:00", reg.saida, formatarExtra(reg.extraMin)]);
+  }
+
+  if(linhas.length === 1){
+    alert("Sem registros no período para exportar.");
+    return;
+  }
+
+  const csv = linhas.map(l => l.join(";")).join("\n");
+  const blob = new Blob(["﻿"+csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const nomeArquivo = `banco-horas_${fmtCurta(start).replace("/","-")}_a_${fmtCurta(end).replace("/","-")}-${end.getFullYear()}.csv`;
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function abrirImagem(base64){
+  document.getElementById("imgModalPic").src = base64;
+  document.getElementById("imgModal").classList.add("show");
+}
+function fecharImagem(){
+  document.getElementById("imgModal").classList.remove("show");
+}
+document.getElementById("closeImgModal").addEventListener("click", fecharImagem);
+document.getElementById("imgModal").addEventListener("click", (e)=>{
+  if(e.target.id === "imgModal") fecharImagem();
+});
+
+/* ---------- Init ---------- */
+renderCabecalho();
+carregarRegistroHoje();
+</script>
+</body>
+</html>
