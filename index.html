@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Banco de Horas</title>
+<link rel="icon" type="image/svg+xml" href="timewallet_icon.svg">
 <style>
   :root{
     --primary:#4A701C;
@@ -367,9 +368,21 @@
   }
   .drawer-head h2{margin:0;font-size:16px;}
 
-  .drawer-body{padding:16px;}
+  .drawer-body{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:flex-start;
+    padding:68px 22px 48px;
+    text-align:center;
+    min-height:100%;
+  }
 
-  .cal-heading{margin-bottom:20px;}
+  .cal-heading{
+    margin-bottom:20px;
+    text-align:center;
+  }
   .cal-heading-date{
     font-size:13px;
     font-weight:600;
