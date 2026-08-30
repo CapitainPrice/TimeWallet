@@ -6,7 +6,7 @@
 
 App pessoal para controle de banco de horas de estágio. O usuário bate ponto de entrada fixo às **15:00** (horário do estágio) e usa o app pra registrar o horário de **saída**, calculando automaticamente quanto tempo extra foi feito (ou descontado, se saiu antes da hora). Foco 100% mobile: usado no celular, no fim do expediente, pra tirar uma foto do comprovante e já sair registrado.
 
-Todo o app é **um único arquivo HTML** (`index.html`), sem build, sem dependências externas, sem framework. HTML + CSS + JS puro, abre direto no navegador (double-click ou `file://`).
+Todo o app é **um único arquivo HTML** (`index.html` na raiz), sem build, sem dependências externas, sem framework. HTML + CSS + JS puro, abre direto no navegador (double-click ou `file://`).
 
 ## Identidade visual
 
@@ -50,11 +50,11 @@ Hoje tudo fica em **`localStorage`** (chave `bancoHoras_registros`, um objeto `{
 ## Deploy (GitHub Pages)
 
 - **Workflow**: `.github/workflows/deploy.yml` — roda a cada push na `main`
-- **Publica**: pasta `bancoHorasEstagio/` (onde está o `index.html`)
+- **Publica**: raiz do repositório (onde está o `index.html`)
 - **URL**: `https://capitainprice.github.io/HourView/`
 - **Passo a passo**:
-  1. Edite `bancoHorasEstagio/index.html`
-  2. `git add bancoHorasEstagio/index.html`
+  1. Edite `index.html`
+  2. `git add index.html`
   3. `git commit -m "mensagem"`
   4. `git push` → GitHub Actions faz o deploy automático
 - **Configuração única no GitHub**: Settings → Pages → Source: "GitHub Actions"
