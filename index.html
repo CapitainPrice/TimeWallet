@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Banco de Horas</title>
+<title>TimeWallet - Banco de Horas</title>
 <link rel="icon" type="image/svg+xml" href="Assets/timewallet_icon.svg">
+<!-- Firebase SDKs via CDN (compat v9 for no-build usage) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- Config local (não commitado) -->
+<script src="config.js"></script>
 <style>
   :root{
     --primary:#4A701C;
@@ -973,22 +979,158 @@
 const PONTO_MINUTOS = 15 * 60; // 15:00 fixo
 const TOLERANCIA_MINUTOS = 15 * 60 + 10; // 15:10 (tolerância até 15:10:59)
 const STORAGE_KEY = "bancoHoras_registros"; // { "YYYY-MM-DD": { saida, extraMin, comprovante } }
+const NOME_KEY = "bancoHoras_nome";
 
 const DIAS_SEMANA = ["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
 const DIAS_SEMANA_ABR = ["D","S","T","Q","Q","S","S"];
 const MESES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 
-/* ---------- Storage layer (troca fácil por Firebase depois) ---------- */
+/* ---------- Firebase Config (carregado de config.js, não commitado) ---------- */
+const FIREBASE_CONFIG = window.FIREBASE_CONFIG || { /* placeholder vazio */ };
+
+/* ---------- Firebase Init ---------- */
+let firebaseApp = null;
+let firebaseAuth = null;
+let firebaseDb = null;
+
+function initFirebase() {
+  if (firebaseApp) return Promise.resolve();
+  try {
+    firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseAuth = firebaseApp.auth();
+    firebaseDb = firebaseApp.firestore();
+    // Enable offline persistence
+    firebaseDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    return Promise.resolve();
+  } catch (e) {
+    console.warn("Firebase init failed:", e);
+    return Promise.resolve(); // Continue without Firebase
+  }
+}
+
+/* ---------- Storage layer (Firebase + localStorage fallback) ---------- */
 const Store = {
-  getAll(){
-    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-    catch(e){ return {}; }
+  _user: null,
+  _authReady: false,
+  _migrated: false,
+  _authListeners: [],
+
+  async init() {
+    await initFirebase();
+    if (!firebaseAuth) {
+      this._authReady = true;
+      this._notifyAuthChange(null);
+      return;
+    }
+    // Listen for auth state changes
+    firebaseAuth.onAuthStateChanged(async (user) => {
+      this._user = user;
+      this._authReady = true;
+      if (user && !this._migrated) {
+        await this._migrateLocalToFirestore();
+        this._migrated = true;
+      }
+      this._notifyAuthChange(user);
+    });
   },
-  get(dateKey){ return this.getAll()[dateKey] || null; },
-  set(dateKey, data){
-    const all = this.getAll();
-    all[dateKey] = data;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+
+  _notifyAuthChange(user) {
+    this._authListeners.forEach(cb => cb(user));
+  },
+
+  onAuthStateChanged(callback) {
+    this._authListeners.push(callback);
+    if (this._authReady) callback(this._user);
+  },
+
+  isAuthenticated() {
+    return !!this._user;
+  },
+
+  getCurrentUser() {
+    return this._user;
+  },
+
+  async signInWithGoogle() {
+    if (!firebaseAuth) throw new Error("Firebase não inicializado");
+    const provider = new firebase.auth.GoogleAuthProvider();
+    return firebaseAuth.signInWithPopup(provider);
+  },
+
+  async signOut() {
+    if (!firebaseAuth) return;
+    return firebaseAuth.signOut();
+  },
+
+  _getCollection() {
+    if (!this._user || !firebaseDb) return null;
+    return firebaseDb.collection("users").doc(this._user.uid).collection("registros");
+  },
+
+  async getAll() {
+    // Wait for auth to be ready
+    while (!this._authReady) await new Promise(r => setTimeout(r, 50));
+
+    const col = this._getCollection();
+    if (col) {
+      // Firestore mode
+      const snapshot = await col.get();
+      const data = {};
+      snapshot.forEach(doc => {
+        data[doc.id] = doc.data();
+      });
+      return data;
+    } else {
+      // localStorage fallback
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+      catch(e) { return {}; }
+    }
+  },
+
+  async get(dateKey) {
+    const all = await this.getAll();
+    return all[dateKey] || null;
+  },
+
+  async set(dateKey, data) {
+    // Wait for auth to be ready
+    while (!this._authReady) await new Promise(r => setTimeout(r, 50));
+
+    const col = this._getCollection();
+    if (col) {
+      // Firestore mode - use set with merge to handle nested objects
+      await col.doc(dateKey).set(data);
+    } else {
+      // localStorage fallback
+      const all = this.getAllSync();
+      all[dateKey] = data;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    }
+  },
+
+  // Synchronous localStorage access (for fallback during init)
+  getAllSync() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch(e) { return {}; }
+  },
+
+  async _migrateLocalToFirestore() {
+    const localData = this.getAllSync();
+    const keys = Object.keys(localData);
+    if (keys.length === 0) return;
+
+    const col = this._getCollection();
+    if (!col) return;
+
+    const batch = firebaseDb.batch();
+    keys.forEach(key => {
+      batch.set(col.doc(key), localData[key]);
+    });
+    await batch.commit();
+
+    // Clear localStorage after successful migration
+    localStorage.removeItem(STORAGE_KEY);
+    console.log(`Migrated ${keys.length} records to Firestore`);
   }
 };
 
@@ -1091,8 +1233,6 @@ function formatarExtra(min){
 const hoje = new Date();
 const hojeKey = toKey(hoje);
 
-const NOME_KEY = "bancoHoras_nome";
-
 function obterNomeUsuario(){
   let nome = localStorage.getItem(NOME_KEY);
   if(nome === null){
@@ -1145,8 +1285,8 @@ let comprovanteBase64 = null;
 let comprovanteNome = null;
 let comprovanteLocalizacao = null;
 
-function carregarRegistroHoje(){
-  const reg = Store.get(hojeKey);
+async function carregarRegistroHoje(){
+  const reg = await Store.get(hojeKey);
   if(reg){
     document.getElementById("saida").value = reg.saida;
     comprovanteBase64 = reg.comprovante || null;
@@ -1230,11 +1370,11 @@ function mostrarResultado(min){
   document.getElementById("horarioCapturado").textContent = `Saída registrada às ${document.getElementById("saida").value}`;
 }
 
-function salvarRegistroHoje(){
+async function salvarRegistroHoje(){
   const saida = document.getElementById("saida").value;
   if(!saida || !comprovanteBase64) return false;
   const extraMin = calcularExtra(saida);
-  Store.set(hojeKey, { saida, extraMin, comprovante: comprovanteBase64, comprovanteNome, localizacao: comprovanteLocalizacao });
+  await Store.set(hojeKey, { saida, extraMin, comprovante: comprovanteBase64, comprovanteNome, localizacao: comprovanteLocalizacao });
   mostrarResultado(extraMin);
   renderCalendario();
   return true;
@@ -1243,11 +1383,11 @@ function salvarRegistroHoje(){
 function processarArquivo(file){
   comprovanteNome = file.name;
   const reader = new FileReader();
-  reader.onload = ()=>{
+  reader.onload = async ()=>{
     comprovanteBase64 = reader.result;
     exibirComprovante(comprovanteBase64);
     preencherHorarioAtual();
-    salvarRegistroHoje();
+    await salvarRegistroHoje();
     mostrarToast("Registro salvo automaticamente!");
     capturarLocalizacao();
   };
@@ -1337,11 +1477,11 @@ const REG_POR_PAGINA = 8;
 let regDadosPeriodo = [];
 let regPaginaAtual = 1;
 
-function renderRegistro(){
+async function renderRegistro(){
   const { start, end } = getPeriodBounds(registroAnchor);
   document.getElementById("regPeriodoLabel").textContent = `${fmtCurta(start)} – ${fmtCurta(end)}/${end.getFullYear()}`;
 
-  const registros = Store.getAll();
+  const registros = await Store.getAll();
   let totalMin = 0;
   regDadosPeriodo = [];
   for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
@@ -1504,7 +1644,7 @@ function fmtCurta(d){
   return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
 }
 
-function renderCalendario(){
+async function renderCalendario(){
   const { start, end } = getPeriodBounds(periodAnchor);
   document.getElementById("monthLabel").textContent = `${fmtCurta(start)} – ${fmtCurta(end)}/${end.getFullYear()}`;
 
@@ -1517,7 +1657,7 @@ function renderCalendario(){
     grid.appendChild(el);
   });
 
-  const registros = Store.getAll();
+  const registros = await Store.getAll();
   const firstDow = start.getDay();
   for(let i=0;i<firstDow;i++){
     const el = document.createElement("div");
@@ -1612,7 +1752,7 @@ function renderFormManual(key, date, dataFmt){
     e.target.value = "";
   });
 
-  document.getElementById("salvarManual").addEventListener("click", ()=>{
+  document.getElementById("salvarManual").addEventListener("click", async ()=>{
     const saida = document.getElementById("saidaManual").value;
     if(!saida){
       alert("Preencha o horário de saída.");
@@ -1623,7 +1763,7 @@ function renderFormManual(key, date, dataFmt){
       return;
     }
     const extraMin = calcularExtra(saida);
-    Store.set(key, { saida, extraMin, comprovante: manualBase64, comprovanteNome: manualNome, localizacao: null });
+    await Store.set(key, { saida, extraMin, comprovante: manualBase64, comprovanteNome: manualNome, localizacao: null });
     mostrarToast("Registro salvo!");
     if(key === hojeKey) carregarRegistroHoje();
     renderCalendario();
@@ -1631,9 +1771,9 @@ function renderFormManual(key, date, dataFmt){
   });
 }
 
-function mostrarDetalhe(key, date){
+async function mostrarDetalhe(key, date){
   mostrarViewDetalhe();
-  const reg = Store.get(key);
+  const reg = await Store.get(key);
   const area = document.getElementById("detailArea");
   const dataFmt = `${DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}/${date.getFullYear()}`;
   if(!reg){
@@ -1708,9 +1848,9 @@ function mostrarDetalhe(key, date){
 
 document.getElementById("exportarBtn").addEventListener("click", gerarImagem);
 
-function gerarImagem(){
+async function gerarImagem(){
   const { start, end } = getPeriodBounds(registroAnchor);
-  const registros = Store.getAll();
+  const registros = await Store.getAll();
   const dados = [];
 
   for(let d = new Date(start); d <= end; d.setDate(d.getDate()+1)){
@@ -1870,8 +2010,49 @@ document.getElementById("imgModal").addEventListener("click", (e)=>{
 });
 
 /* ---------- Init ---------- */
-renderCabecalho();
-carregarRegistroHoje();
+async function initApp() {
+  await Store.init();
+  renderCabecalho();
+  await carregarRegistroHoje();
+
+  // Listen for auth state changes to update UI
+  Store.onAuthStateChanged((user) => {
+    const btnUsuario = document.getElementById("btnUsuario");
+    if (user) {
+      // User is signed in - show avatar/name
+      btnUsuario.innerHTML = `
+        <img src="${user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="%234A701C"/></svg>'}"
+             style="width:32px;height:32px;border-radius:50%;object-fit:cover;"
+             alt="${user.displayName || 'Usuário'}">
+      `;
+      btnUsuario.title = user.displayName || user.email || "Usuário logado";
+      btnUsuario.onclick = async () => {
+        if (confirm("Deseja sair?")) {
+          await Store.signOut();
+        }
+      };
+    } else {
+      // User is signed out - show default icon
+      btnUsuario.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+      `;
+      btnUsuario.title = "Entrar com Google";
+      btnUsuario.onclick = async () => {
+        try {
+          await Store.signInWithGoogle();
+        } catch (e) {
+          console.error("Erro no login:", e);
+          mostrarToast("Erro ao entrar. Tente novamente.");
+        }
+      };
+    }
+  });
+}
+
+initApp();
 </script>
 </body>
 </html>

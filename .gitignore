@@ -14,6 +14,7 @@ Thumbs.db
 # Local config
 *.local
 .env
+config.js
 
 # Logs
 *.log

@@ -39,12 +39,30 @@ Calendário considera **sábado, domingo e feriados nacionais brasileiros** como
 
 ## Persistência
 
-Hoje tudo fica em **`localStorage`** (chave `bancoHoras_registros`, um objeto `{ "YYYY-MM-DD": { saida, extraMin, comprovante (base64), comprovanteNome, localizacao } }`), acessado por um objeto `Store` isolado (`get`/`set`/`getAll`) — é o único ponto que precisa mudar pra migrar pro **Firebase** (Firestore + Storage + Auth anônimo), trocando os métodos do `Store` por chamadas assíncronas equivalentes. O resto do app (UI, cálculo, calendário) não depende de como os dados são persistidos.
+**Dual-mode: Firebase (prioridade) + localStorage (fallback)**
+
+- **Autenticado**: Firestore em `users/{uid}/registros/{dateKey}` — sincroniza entre dispositivos, persiste offline
+- **Não autenticado**: `localStorage` (chave `bancoHoras_registros`) — comportamento original
+
+O objeto `Store` abstrai isso: `getAll()`, `get(key)`, `set(key, data)` — todos **async** (retornam Promise). Migração automática `localStorage → Firestore` no primeiro login.
+
+Estrutura no Firestore:
+```
+users/{uid}/
+  registros/{YYYY-MM-DD}/
+    saida: "HH:MM"
+    extraMin: number
+    comprovante: "data:image/...base64"
+    comprovanteNome: "arquivo.jpg"
+    localizacao: { lat, lng, endereco }
+```
 
 ## Observações técnicas
 
 - Geolocalização e câmera (`getUserMedia`) exigem contexto seguro (HTTPS ou `localhost`) — abrindo como `file://` local, o navegador bloqueia essas APIs silenciosamente e cai em fallback (input de arquivo comum sem localização).
-- Item "Usuário" no botão de perfil é placeholder ("Em breve!") — funcionalidade ainda não implementada.
+- **Auth Google implementado**: botão de usuário no header → login/logout com Firebase Auth
+- **App Check recomendado**: reCAPTCHA v3 no Firebase Console para proteger API key
+- **Regras Firestore**: travadas por `request.auth.uid == userId` (cada usuário só acessa seus dados)
 - Sem framework, sem bundler: qualquer mudança é direto no `index.html`.
 
 ## Deploy (GitHub Pages)
@@ -58,3 +76,19 @@ Hoje tudo fica em **`localStorage`** (chave `bancoHoras_registros`, um objeto `{
   3. `git commit -m "mensagem"`
   4. `git push` → GitHub Actions faz o deploy automático
 - **Configuração única no GitHub**: Settings → Pages → Source: "GitHub Actions"
+
+## Configuração Firebase (local, não commitado)
+
+Arquivo `config.js` na raiz (adicionado ao `.gitignore`):
+```js
+window.FIREBASE_CONFIG = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
+```
+
+Carregado no `index.html` **antes** do script principal (linha 12).
