@@ -637,7 +637,8 @@
     transition:opacity .2s;
   }
   .cam-modal.show{opacity:1;pointer-events:auto;}
-  .cam-modal video, .cam-modal img{flex:1;width:100%;min-height:0;object-fit:cover;background:#000;}
+  .cam-modal video{flex:1;width:100%;min-height:0;object-fit:cover;background:#000;transform:scaleX(-1);}
+.cam-modal img{flex:1;width:100%;min-height:0;object-fit:cover;background:#000;}
   .cam-question{
     color:#fff;
     text-align:center;
@@ -1287,9 +1288,7 @@ function capturarFoto(){
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   const ctx = canvas.getContext("2d");
-  // Espelhar horizontalmente para câmera frontal (preview é espelhado, foto deve ser igual)
-  ctx.translate(canvas.width, 0);
-  ctx.scale(-1, 1);
+  // Preview é espelhado via CSS (transform: scaleX(-1)), captura direta sem espelhar
   ctx.drawImage(video, 0, 0);
   fotoCapturada = canvas.toDataURL("image/jpeg", 0.85);
 
