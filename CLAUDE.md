@@ -51,7 +51,7 @@ Hoje tudo fica em **`localStorage`** (chave `bancoHoras_registros`, um objeto `{
 
 - **Workflow**: `.github/workflows/deploy.yml` — roda a cada push na `main`
 - **Publica**: raiz do repositório (onde está o `index.html`)
-- **URL**: `https://capitainprice.github.io/HourView/`
+- **URL**: `https://capitainprice.github.io/TimeWallet/`
 - **Passo a passo**:
   1. Edite `index.html`
   2. `git add index.html`
