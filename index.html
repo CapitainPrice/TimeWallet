@@ -194,7 +194,35 @@
     display:flex;align-items:center;justify-content:center;
     cursor:pointer;
   }
+  .user-btn img{width:32px;height:32px;border-radius:50%;object-fit:cover;}
   .user-btn svg{width:17px;height:17px;stroke:var(--primary-dark);}
+
+  .user-menu{position:relative;}
+  .user-dropdown{
+    position:absolute;top:calc(100% + 8px);right:0;
+    width:220px;background:var(--card);border-radius:var(--radius);
+    box-shadow:0 8px 24px rgba(0,0,0,0.15);z-index:100;
+    overflow:hidden;opacity:0;visibility:hidden;transform:translateY(-8px);
+    transition:opacity .2s,transform .2s,visibility .2s;
+  }
+  .user-dropdown:not([hidden]){opacity:1;visibility:visible;transform:translateY(0);}
+  .dropdown-header{
+    padding:12px 14px;display:flex;align-items:center;gap:10px;
+    border-bottom:1px solid var(--primary-light);
+  }
+  .dropdown-header img{width:40px;height:40px;border-radius:50%;object-fit:cover;}
+  .dropdown-header .user-info{flex:1;min-width:0;}
+  .dropdown-header .user-name{font-weight:600;font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dropdown-header .user-email{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dropdown-divider{height:1px;background:var(--primary-light);}
+  .dropdown-item{
+    width:100%;padding:10px 14px;border:none;background:none;color:var(--text);
+    font:inherit;font-size:14px;display:flex;align-items:center;gap:10px;
+    cursor:pointer;text-align:left;transition:background .15s;
+  }
+  .dropdown-item:hover{background:var(--primary-light);}
+  .dropdown-item svg{width:18px;height:18px;stroke:var(--muted);flex-shrink:0;}
+  .dropdown-item:hover svg{stroke:var(--primary);}
 
 
   .app-footer{
@@ -729,9 +757,23 @@
       </button>
       <span class="sub-header-date" id="dataPrincipal">—</span>
     </div>
-    <button class="user-btn" id="btnUsuario" type="button" aria-label="Usuário">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-    </button>
+    <div class="user-menu" id="userMenu">
+      <button class="user-btn" id="btnUsuario" type="button" aria-label="Usuário" aria-expanded="false" aria-haspopup="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      </button>
+      <div class="user-dropdown" id="userDropdown" role="menu" hidden>
+        <div class="dropdown-header" id="dropdownHeader"></div>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item" id="dropdownSignIn" role="menuitem" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span>Entrar com Google</span>
+        </button>
+        <button class="dropdown-item" id="dropdownSignOut" role="menuitem" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Sair</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <main class="hero-wrap">
@@ -2015,24 +2057,49 @@ async function initApp() {
   renderCabecalho();
   await carregarRegistroHoje();
 
+  // Dropdown toggle
+  const btnUsuario = document.getElementById("btnUsuario");
+  const userDropdown = document.getElementById("userDropdown");
+  btnUsuario.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = userDropdown.hidden;
+    userDropdown.hidden = !isOpen;
+    btnUsuario.setAttribute("aria-expanded", isOpen);
+  });
+  document.addEventListener("click", () => {
+    userDropdown.hidden = true;
+    btnUsuario.setAttribute("aria-expanded", "false");
+  });
+
   // Listen for auth state changes to update UI
   Store.onAuthStateChanged((user) => {
-    const btnUsuario = document.getElementById("btnUsuario");
+    const dropdownHeader = document.getElementById("dropdownHeader");
+    const dropdownSignIn = document.getElementById("dropdownSignIn");
+    const dropdownSignOut = document.getElementById("dropdownSignOut");
     if (user) {
-      // User is signed in - show avatar/name
+      // User is signed in
       btnUsuario.innerHTML = `
         <img src="${user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="%234A701C"/></svg>'}"
              style="width:32px;height:32px;border-radius:50%;object-fit:cover;"
              alt="${user.displayName || 'Usuário'}">
       `;
       btnUsuario.title = user.displayName || user.email || "Usuário logado";
-      btnUsuario.onclick = async () => {
-        if (confirm("Deseja sair?")) {
-          await Store.signOut();
-        }
+      dropdownHeader.innerHTML = `
+        <img src="${user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="%234A701C"/></svg>'}" alt="">
+        <div class="user-info">
+          <div class="user-name">${user.displayName || 'Usuário'}</div>
+          <div class="user-email">${user.email || ''}</div>
+        </div>
+      `;
+      dropdownSignIn.hidden = true;
+      dropdownSignOut.hidden = false;
+      dropdownSignOut.onclick = async () => {
+        await Store.signOut();
+        userDropdown.hidden = true;
+        btnUsuario.setAttribute("aria-expanded", "false");
       };
     } else {
-      // User is signed out - show default icon
+      // User is signed out
       btnUsuario.innerHTML = `
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -2040,13 +2107,22 @@ async function initApp() {
         </svg>
       `;
       btnUsuario.title = "Entrar com Google";
-      btnUsuario.onclick = async () => {
+      dropdownHeader.innerHTML = `
+        <div class="user-info" style="width:100%;text-align:center;padding:8px 0;">
+          <div class="user-name" style="color:var(--muted);">Não conectado</div>
+        </div>
+      `;
+      dropdownSignIn.hidden = false;
+      dropdownSignOut.hidden = true;
+      dropdownSignIn.onclick = async () => {
         try {
           await Store.signInWithGoogle();
         } catch (e) {
           console.error("Erro no login:", e);
           mostrarToast("Erro ao entrar. Tente novamente.");
         }
+        userDropdown.hidden = true;
+        btnUsuario.setAttribute("aria-expanded", "false");
       };
     }
   });
