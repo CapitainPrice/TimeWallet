@@ -9,6 +9,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="../config.js"></script>
 </head>
 <body data-view="registro" data-root="..">
@@ -55,7 +56,7 @@
       <div class="cal-heading-date" id="registroPeriodo">—</div>
 
       <div class="detail-hero hero-muted" id="registroHero" style="margin-top:24px;">
-        <div class="dh-label">Saldo atual</div>
+        <div class="dh-label">Saldo acomulado</div>
         <div class="dh-value" id="registroSaldo">0min</div>
       </div>
 
@@ -75,6 +76,10 @@
       </div>
 
       <div class="cal-card reg-card" style="margin-top:24px;">
+        <div class="reg-export-copy reg-history-copy">
+          <div class="reg-export-title">Histórico de registros</div>
+          <div class="reg-export-text">Consulte os registros salvos dentro do período selecionado do ciclo atual.</div>
+        </div>
         <div class="period-label period-label-centered">Período</div>
         <div class="cal-nav">
           <button id="regPrevPeriod">‹</button>
@@ -90,6 +95,25 @@
         </div>
         <div class="reg-tabela" id="regTabela"></div>
         <div class="reg-paginacao" id="regPaginacao"></div>
+      </div>
+
+      <div class="reg-export-card">
+        <div class="reg-export-copy">
+          <div class="reg-export-title">Comprovantes do período</div>
+          <div class="reg-export-text" id="comprovantePeriodoTexto">Selecione um dos 6 períodos do ciclo atual.</div>
+        </div>
+        <div class="period-select-grid reg-download-grid">
+          <label class="period-field" for="comprovantePeriodoSelect">
+            <span>Período de 6 meses</span>
+            <select class="period-select" id="comprovantePeriodoSelect"></select>
+          </label>
+        </div>
+        <button class="btn reg-export-btn" id="baixarComprovantesBtn" type="button">
+          <span class="btn-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+          </span>
+          Baixar comprovantes do período
+        </button>
       </div>
 
     </main>

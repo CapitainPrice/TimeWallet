@@ -2,10 +2,14 @@
   const App = window.TimeWallet;
   if (!App) return;
 
-  const REG_POR_PAGINA = 8;
+  const REG_POR_PAGINA = 6;
+  const COMPROVANTE_PERIODO_MESES = 6;
+  const COMPROVANTE_CICLO_KEY_PREFIX = "bancoHoras_comprovantes_primeiro_login";
   let registroAnchor = App.getCurrentPaymentAnchor();
   let regDadosPeriodo = [];
+  let regDadosCiclo = [];
   let regPaginaAtual = 1;
+  let comprovantePeriodos = [];
   let logoDataUrl = null;
 
   async function getLogoDataUrl() {
@@ -38,8 +42,8 @@
     return registro?.comprovanteNome || "comprovante";
   }
 
-  function getResumoPeriodo() {
-    return regDadosPeriodo.reduce((acc, item) => {
+  function getResumoLista(lista) {
+    return lista.reduce((acc, item) => {
       acc.total += 1;
       if (item.reg.extraMin > 0) acc.positivos += 1;
       if (item.reg.extraMin < 0) acc.negativos += 1;
@@ -48,8 +52,253 @@
     }, { total: 0, positivos: 0, negativos: 0, saldo: 0 });
   }
 
+  function getResumoPeriodo() {
+    return getResumoLista(regDadosPeriodo);
+  }
+
+  function getResumoCiclo() {
+    return getResumoLista(regDadosCiclo);
+  }
+
+  function startOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+
+  function endOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  }
+
+  function addMonths(date, months) {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+  }
+
+  function formatMonthYear(date) {
+    return `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+  }
+
+  function getSemestralLabel(start, end) {
+    return `${String(start.getDate()).padStart(2, "0")}/${String(start.getMonth() + 1).padStart(2, "0")}/${start.getFullYear()} – ${String(end.getDate()).padStart(2, "0")}/${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
+  }
+
+  function getComprovanteCicloKey() {
+    const uid = App.Store?.getCurrentUser?.()?.uid || "guest";
+    return `${COMPROVANTE_CICLO_KEY_PREFIX}_${uid}`;
+  }
+
+  function getComprovanteCicloBase() {
+    const key = getComprovanteCicloKey();
+    const salvo = localStorage.getItem(key);
+    if (salvo) {
+      const dataSalva = new Date(`${salvo}T00:00:00`);
+      if (!Number.isNaN(dataSalva.getTime())) return dataSalva;
+    }
+    const hoje = new Date();
+    localStorage.setItem(key, App.toKey(hoje));
+    return hoje;
+  }
+
+  function setComprovanteCicloBase(date) {
+    localStorage.setItem(getComprovanteCicloKey(), App.toKey(date));
+  }
+
+  function getComprovanteCicloAtual() {
+    let inicio = startOfMonth(getComprovanteCicloBase());
+    let fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
+    const hoje = new Date();
+
+    while (hoje > fim) {
+      inicio = addMonths(inicio, COMPROVANTE_PERIODO_MESES);
+      fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
+      setComprovanteCicloBase(inicio);
+    }
+
+    return { start: inicio, end: fim };
+  }
+
+  function atualizarTextoCardComprovantes() {
+    const el = App.byId("comprovantePeriodoTexto");
+    if (!el) return;
+    const ciclo = getComprovanteCicloAtual();
+    el.textContent = `Selecione um dos 6 meses do ciclo atual (${getSemestralLabel(ciclo.start, ciclo.end)}).`;
+  }
+
+  function preencherPeriodosComprovante() {
+    const select = App.byId("comprovantePeriodoSelect");
+    if (!select) return;
+
+    const valorAtual = select.value;
+    const ciclo = getComprovanteCicloAtual();
+    const periodoAtual = App.getCurrentPaymentAnchor(new Date());
+    const periodoAtualKey = App.toKey(periodoAtual);
+    comprovantePeriodos = [];
+
+    for (let i = 0; i < COMPROVANTE_PERIODO_MESES; i += 1) {
+      const anchor = addMonths(ciclo.start, i);
+      const bounds = App.getPeriodBounds(anchor);
+      comprovantePeriodos.push({
+        value: App.toKey(anchor),
+        anchor,
+        start: bounds.start,
+        end: bounds.end,
+        label: getSemestralLabel(bounds.start, bounds.end),
+      });
+    }
+
+    select.innerHTML = comprovantePeriodos.map((periodo) => `<option value="${periodo.value}">${periodo.label}</option>`).join("");
+    select.disabled = false;
+    select.value = comprovantePeriodos.some((periodo) => periodo.value === valorAtual)
+      ? valorAtual
+      : comprovantePeriodos.some((periodo) => periodo.value === periodoAtualKey)
+        ? periodoAtualKey
+        : comprovantePeriodos[0].value;
+
+    if (!comprovantePeriodos.some((periodo) => periodo.value === App.toKey(registroAnchor))) {
+      registroAnchor = comprovantePeriodos[0].anchor;
+    }
+
+    atualizarTextoCardComprovantes();
+  }
+
+  function atualizarNavegacaoPeriodo() {
+    const prevBtn = App.byId("regPrevPeriod");
+    const nextBtn = App.byId("regNextPeriod");
+    const indiceAtual = comprovantePeriodos.findIndex((periodo) => periodo.value === App.toKey(registroAnchor));
+    if (prevBtn) prevBtn.disabled = indiceAtual <= 0;
+    if (nextBtn) nextBtn.disabled = indiceAtual < 0 || indiceAtual >= comprovantePeriodos.length - 1;
+  }
+
+  function moverPeriodoRegistro(direcao) {
+    const indiceAtual = comprovantePeriodos.findIndex((periodo) => periodo.value === App.toKey(registroAnchor));
+    const proximoIndice = indiceAtual + direcao;
+    if (proximoIndice < 0 || proximoIndice >= comprovantePeriodos.length) return false;
+    registroAnchor = comprovantePeriodos[proximoIndice].anchor;
+    return true;
+  }
+
+  function sincronizarSelectComRegistro() {
+    const select = App.byId("comprovantePeriodoSelect");
+    if (select) select.value = App.toKey(registroAnchor);
+  }
+
+  function sincronizarRegistroComSelect() {
+    const select = App.byId("comprovantePeriodoSelect");
+    if (!select) return false;
+    const periodo = comprovantePeriodos.find((item) => item.value === select.value);
+    if (!periodo) return false;
+    registroAnchor = periodo.anchor;
+    return true;
+  }
+
+  function initSelectPeriodoComprovante() {
+    App.on("comprovantePeriodoSelect", "change", async () => {
+      if (!sincronizarRegistroComSelect()) return;
+      await renderRegistro();
+    });
+  }
+
+  function getPeriodoRegistroAtual() {
+    return comprovantePeriodos.find((periodo) => periodo.value === App.toKey(registroAnchor)) || null;
+  }
+
+  function getPeriodoZipLabel(periodo) {
+    return `${String(periodo.start.getDate()).padStart(2, "0")}-${String(periodo.start.getMonth() + 1).padStart(2, "0")}-${periodo.start.getFullYear()}_a_${String(periodo.end.getDate()).padStart(2, "0")}-${String(periodo.end.getMonth() + 1).padStart(2, "0")}-${periodo.end.getFullYear()}`;
+  }
+
+  function atualizarCabecalhoPeriodo() {
+    const periodoLabel = App.byId("regPeriodoLabel");
+    if (!periodoLabel) return;
+    const periodo = getPeriodoRegistroAtual();
+    if (!periodo) return;
+    periodoLabel.textContent = periodo.label;
+    sincronizarSelectComRegistro();
+    atualizarNavegacaoPeriodo();
+  }
+
+  function atualizarTextoCardComprovantes() {
+    const el = App.byId("comprovantePeriodoTexto");
+    if (!el) return;
+    const ciclo = getComprovanteCicloAtual();
+    el.textContent = `Selecione um dos 6 períodos do ciclo atual (${getSemestralLabel(ciclo.start, ciclo.end)}).`;
+  }
+
+  function getComprovantesPeriodoSelecionado(registros) {
+    const select = App.byId("comprovantePeriodoSelect");
+    if (!select || !select.value) return { periodo: null, itens: [] };
+    const periodo = comprovantePeriodos.find((item) => item.value === select.value);
+    if (!periodo) return { periodo: null, itens: [] };
+
+    const itens = [];
+    for (let d = new Date(periodo.start); d <= periodo.end; d.setDate(d.getDate() + 1)) {
+      const date = new Date(d);
+      const key = App.toKey(date);
+      const reg = registros[key];
+      if (!reg?.comprovante) continue;
+      itens.push({ key, date, reg });
+    }
+    return { periodo, itens };
+  }
+
+  function baixarBlob(blob, nomeArquivo) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivo;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function getComprovanteExtensao(reg) {
+    const nome = String(reg?.comprovanteNome || "");
+    const match = nome.match(/\.([a-zA-Z0-9]+)$/);
+    if (match?.[1]) return match[1].toLowerCase();
+    const mimeMatch = String(reg?.comprovante || "").match(/^data:image\/([a-zA-Z0-9.+-]+);base64,/i);
+    if (mimeMatch?.[1]) return mimeMatch[1].toLowerCase().replace("jpeg", "jpg");
+    return "jpg";
+  }
+
+  function getComprovanteZipNome(key, date, reg) {
+    const info = App.getComprovanteInfo ? App.getComprovanteInfo(key, reg.comprovanteNome) : null;
+    const ext = getComprovanteExtensao(reg);
+    const dia = `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+    const base = info?.resumo || `comprovante_${dia}`;
+    return `${dia}_${base.replace(/[\\/:*?"<>|]/g, "-")}.${ext}`;
+  }
+
+  function dataUrlToUint8Array(dataUrl) {
+    const [, base64] = String(dataUrl || "").split(",");
+    const binary = atob(base64 || "");
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+  }
+
+  async function baixarComprovantesPeriodo() {
+    const registros = await App.Store.getAll();
+    const { periodo, itens } = getComprovantesPeriodoSelecionado(registros);
+    if (!periodo || itens.length === 0) {
+      alert("Sem comprovantes neste período.");
+      return;
+    }
+    if (!window.JSZip) {
+      alert("Biblioteca de compactação indisponível.");
+      return;
+    }
+
+    const zip = new window.JSZip();
+    itens.forEach(({ key, date, reg }) => {
+      zip.file(getComprovanteZipNome(key, date, reg), dataUrlToUint8Array(reg.comprovante));
+    });
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const nomeArquivo = `comprovantes_${formatMonthYear(periodo.start).replace("/", "-")}.zip`;
+    baixarBlob(blob, nomeArquivo);
+    App.mostrarToast("Comprovantes baixados!");
+  }
+
   function atualizarResumoTela() {
-    const resumo = getResumoPeriodo();
+    const resumo = getResumoCiclo();
     const hero = App.byId("registroHero");
     const saldoEl = App.byId("registroSaldo");
     const periodoAtual = App.byId("registroPeriodo");
@@ -65,21 +314,34 @@
       saldoEl.textContent = App.formatarExtra(resumo.saldo);
       saldoEl.style.color = "#fff";
     }
-    if (periodoAtual) periodoAtual.textContent = `Período ${App.getPeriodLabel(registroAnchor)}`;
+    if (periodoAtual) {
+      const ciclo = getComprovanteCicloAtual();
+      periodoAtual.textContent = `Ciclo atual (${getSemestralLabel(ciclo.start, ciclo.end)})`;
+    }
     if (countEl) countEl.textContent = String(resumo.total);
     if (positivosEl) positivosEl.textContent = String(resumo.positivos);
     if (negativosEl) negativosEl.textContent = String(resumo.negativos);
   }
 
   async function renderRegistro() {
-    const periodoLabel = App.byId("regPeriodoLabel");
-    if (!periodoLabel) return;
+    if (!App.byId("regPeriodoLabel")) return;
 
+    preencherPeriodosComprovante();
+    atualizarCabecalhoPeriodo();
     const { start, end } = App.getPeriodBounds(registroAnchor);
-    periodoLabel.textContent = App.getPeriodLabel(registroAnchor);
-
     const registros = await App.Store.getAll();
     regDadosPeriodo = [];
+    regDadosCiclo = [];
+
+    comprovantePeriodos.forEach((periodo) => {
+      for (let d = new Date(periodo.start); d <= periodo.end; d.setDate(d.getDate() + 1)) {
+        const date = new Date(d);
+        const key = App.toKey(date);
+        const reg = registros[key];
+        if (!reg) continue;
+        regDadosCiclo.push({ key, date, reg });
+      }
+    });
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const date = new Date(d);
@@ -107,7 +369,7 @@
 
     const linhasHtml = fatia.map(({ date, reg }) => {
       const estado = getExtraClasse(reg.extraMin);
-      const diaLabel = `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+      const diaLabel = `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}`;
       const localizacao = reg.localizacao ? App.getLocationMapLink(reg.localizacao) : '<span style="color:var(--muted);font-size:11px;">Não registrada</span>';
       return `
         <div class="reg-row ${estado}">
@@ -388,16 +650,17 @@
   }
 
   App.on("regPrevPeriod", "click", async () => {
-    registroAnchor = App.shiftPaymentAnchor(registroAnchor, -1);
+    if (!moverPeriodoRegistro(-1)) return;
     await renderRegistro();
   });
 
   App.on("regNextPeriod", "click", async () => {
-    registroAnchor = App.shiftPaymentAnchor(registroAnchor, 1);
+    if (!moverPeriodoRegistro(1)) return;
     await renderRegistro();
   });
 
-  App.on("exportarBtn", "click", gerarImagem);
+  initSelectPeriodoComprovante();
+  App.on("baixarComprovantesBtn", "click", baixarComprovantesPeriodo);
 
   App.initShell({
     onReady: async () => {

@@ -28,6 +28,16 @@
   let comprovanteLocalizacao = null;
   let camStream = null;
   let fotoCapturada = null;
+  let registroHojeTravado = false;
+  let timerViradaDia = null;
+
+  function getAgora() {
+    return new Date();
+  }
+
+  function getHojeKey() {
+    return App.toKey(getAgora());
+  }
 
   function periodoDoDia(hora) {
     if (hora < 12) return "manha";
@@ -38,11 +48,21 @@
   function renderCabecalhoHome() {
     const titulo = App.byId("saudacaoPrincipal");
     if (!titulo) return;
+    const agora = getAgora();
     const nomeRaw = App.obterNomeUsuario();
     const nomeTexto = nomeRaw ? `, ${nomeRaw}` : "";
-    const lista = FRASES_SAUDACAO[periodoDoDia(App.hoje.getHours())];
-    const diaDoAno = Math.floor((App.hoje - new Date(App.hoje.getFullYear(), 0, 0)) / 86400000);
+    const lista = FRASES_SAUDACAO[periodoDoDia(agora.getHours())];
+    const diaDoAno = Math.floor((agora - new Date(agora.getFullYear(), 0, 0)) / 86400000);
     titulo.textContent = lista[diaDoAno % lista.length](nomeTexto);
+  }
+
+  function atualizarTravaRegistroHoje(travado) {
+    registroHojeTravado = Boolean(travado);
+    const btn = App.byId("btnCamera");
+    if (!btn) return;
+    btn.disabled = registroHojeTravado;
+    btn.style.opacity = registroHojeTravado ? ".55" : "";
+    btn.style.cursor = registroHojeTravado ? "not-allowed" : "";
   }
 
   function limparRegistroHojeUI() {
@@ -75,11 +95,12 @@
       resultBox.style.background = "";
       resultBox.style.color = "";
     }
-    atualizarMetaComprovante(App.hojeKey, null);
+    atualizarMetaComprovante(getHojeKey(), null);
 
     comprovanteBase64 = null;
     comprovanteNome = null;
     comprovanteLocalizacao = null;
+    atualizarTravaRegistroHoje(false);
   }
 
   function exibirComprovante(base64) {
@@ -100,7 +121,7 @@
   function preencherHorarioAtual() {
     const saida = App.byId("saida");
     if (!saida) return;
-    const agora = new Date();
+    const agora = getAgora();
     saida.value = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
   }
 
@@ -142,8 +163,9 @@
 
   async function carregarRegistroHoje() {
     if (!App.byId("saida")) return;
+    const hojeKey = getHojeKey();
     limparRegistroHojeUI();
-    const reg = await App.Store.get(App.hojeKey);
+    const reg = await App.Store.get(hojeKey);
     if (!reg) return;
 
     App.byId("saida").value = reg.saida;
@@ -152,22 +174,33 @@
     comprovanteLocalizacao = reg.localizacao || null;
 
     if (comprovanteBase64) exibirComprovante(comprovanteBase64);
-    atualizarMetaComprovante(App.hojeKey, comprovanteNome);
+    atualizarMetaComprovante(hojeKey, comprovanteNome);
     if (comprovanteLocalizacao) exibirStatusGeo(`Localização: ${App.getLocationDisplay(comprovanteLocalizacao)}`);
     mostrarResultado(reg.extraMin, reg.saida);
+    atualizarTravaRegistroHoje(true);
   }
 
   async function salvarRegistroHoje() {
     const saida = App.byId("saida");
+    const hojeKey = getHojeKey();
     if (!saida || !saida.value || !comprovanteBase64) return false;
+
+    const existente = await App.Store.get(hojeKey);
+    if (existente) {
+      atualizarTravaRegistroHoje(true);
+      App.mostrarToast("Você já registrou sua saída hoje.");
+      return false;
+    }
+
     const extraMin = App.calcularExtra(saida.value);
-    const comprovanteInfo = App.getComprovanteInfo ? App.getComprovanteInfo(App.hojeKey, comprovanteNome) : {
+    const comprovanteInfo = App.getComprovanteInfo ? App.getComprovanteInfo(hojeKey, comprovanteNome) : {
       nome: comprovanteNome,
       resumo: comprovanteNome,
       periodo: "—",
     };
     comprovanteNome = comprovanteInfo.nome;
-    await App.Store.set(App.hojeKey, {
+
+    await App.Store.set(hojeKey, {
       saida: saida.value,
       extraMin,
       comprovante: comprovanteBase64,
@@ -176,18 +209,24 @@
       localizacao: comprovanteLocalizacao,
     });
     mostrarResultado(extraMin, saida.value);
-    atualizarMetaComprovante(App.hojeKey, comprovanteNome);
+    atualizarMetaComprovante(hojeKey, comprovanteNome);
+    atualizarTravaRegistroHoje(true);
     return true;
   }
 
   function processarArquivo(file) {
-    comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(App.hojeKey, file.name) : file.name;
+    if (registroHojeTravado) {
+      App.mostrarToast("Você já registrou sua saída hoje.");
+      return;
+    }
+    comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(getHojeKey(), file.name) : file.name;
     const reader = new FileReader();
     reader.onload = async () => {
       comprovanteBase64 = reader.result;
       exibirComprovante(comprovanteBase64);
       preencherHorarioAtual();
-      await salvarRegistroHoje();
+      const salvou = await salvarRegistroHoje();
+      if (!salvou) return;
       App.mostrarToast("Registro salvo automaticamente!");
       capturarLocalizacao();
     };
@@ -214,7 +253,6 @@
         const address = await App.reverseGeocode(lat, lng);
         comprovanteLocalizacao.address = address;
         exibirStatusGeo(`Localização: ${address}`);
-        await salvarRegistroHoje();
       },
       (error) => {
         comprovanteLocalizacao = null;
@@ -233,6 +271,10 @@
   }
 
   async function abrirCamera() {
+    if (registroHojeTravado) {
+      App.mostrarToast("Você já registrou sua saída hoje.");
+      return;
+    }
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       App.byId("comprovanteCamera")?.click();
       return;
@@ -302,14 +344,26 @@
   async function confirmarFoto() {
     const foto = fotoCapturada;
     fecharCamera();
-    if (!foto) return;
-    comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(App.hojeKey, "foto.jpg") : `foto_${Date.now()}.jpg`;
+    if (!foto || registroHojeTravado) return;
+    comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(getHojeKey(), "foto.jpg") : `foto_${Date.now()}.jpg`;
     comprovanteBase64 = foto;
     exibirComprovante(comprovanteBase64);
     preencherHorarioAtual();
-    await salvarRegistroHoje();
+    const salvou = await salvarRegistroHoje();
+    if (!salvou) return;
     App.mostrarToast("Registro salvo automaticamente!");
     capturarLocalizacao();
+  }
+
+  function agendarViradaDoDia() {
+    if (timerViradaDia) window.clearTimeout(timerViradaDia);
+    const agora = getAgora();
+    const proximaVirada = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1, 0, 0, 0, 50);
+    timerViradaDia = window.setTimeout(async () => {
+      renderCabecalhoHome();
+      await carregarRegistroHoje();
+      agendarViradaDoDia();
+    }, Math.max(1000, proximaVirada.getTime() - agora.getTime()));
   }
 
   App.on("btnRegistro", "click", App.goToRegistro);
@@ -328,8 +382,10 @@
     onReady: async () => {
       renderCabecalhoHome();
       await carregarRegistroHoje();
+      agendarViradaDoDia();
     },
     onAuthChange: async () => {
+      renderCabecalhoHome();
       await carregarRegistroHoje();
     },
   });

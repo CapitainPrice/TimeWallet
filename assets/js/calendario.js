@@ -2,6 +2,8 @@
   const App = window.TimeWallet;
   if (!App) return;
 
+  const COMPROVANTE_PERIODO_MESES = 6;
+  const COMPROVANTE_CICLO_KEY_PREFIX = "bancoHoras_comprovantes_primeiro_login";
   let periodAnchor = App.getCurrentPaymentAnchor();
 
   function mostrarViewCalendario() {
@@ -32,6 +34,61 @@
   function renderCabecalhoDetalhe(data) {
     const el = App.byId("detailHeadingData");
     if (el) el.textContent = App.formatarDataPrincipal(data);
+  }
+
+  function startOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+
+  function addMonths(date, months) {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+  }
+
+  function getComprovanteCicloKey() {
+    const uid = App.Store?.getCurrentUser?.()?.uid || "guest";
+    return `${COMPROVANTE_CICLO_KEY_PREFIX}_${uid}`;
+  }
+
+  function getComprovanteCicloBase() {
+    const key = getComprovanteCicloKey();
+    const salvo = localStorage.getItem(key);
+    if (salvo) {
+      const dataSalva = new Date(`${salvo}T00:00:00`);
+      if (!Number.isNaN(dataSalva.getTime())) return dataSalva;
+    }
+    const hoje = new Date();
+    localStorage.setItem(key, App.toKey(hoje));
+    return hoje;
+  }
+
+  function setComprovanteCicloBase(date) {
+    localStorage.setItem(getComprovanteCicloKey(), App.toKey(date));
+  }
+
+  function getComprovanteCicloAtual() {
+    let inicio = startOfMonth(getComprovanteCicloBase());
+    let fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
+    const hoje = new Date();
+
+    while (hoje > fim) {
+      inicio = addMonths(inicio, COMPROVANTE_PERIODO_MESES);
+      fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
+      setComprovanteCicloBase(inicio);
+    }
+
+    return { start: inicio, end: fim };
+  }
+
+  function getPrimeiroPeriodoPermitido() {
+    return startOfMonth(getComprovanteCicloAtual().start);
+  }
+
+  function isDentroDoCicloAtual(anchor) {
+    const ciclo = getComprovanteCicloAtual();
+    const inicio = startOfMonth(ciclo.start);
+    const fim = startOfMonth(addMonths(ciclo.start, COMPROVANTE_PERIODO_MESES - 1));
+    const atual = startOfMonth(anchor);
+    return atual >= inicio && atual <= fim;
   }
 
   function fillPeriodSelect(selectId, selectedValue) {
@@ -73,10 +130,18 @@
   async function renderCalendario() {
     const monthLabel = App.byId("monthLabel");
     const grid = App.byId("calGrid");
+    const prevBtn = App.byId("prevMonth");
+    const nextBtn = App.byId("nextMonth");
     if (!monthLabel || !grid) return;
+
+    if (!isDentroDoCicloAtual(periodAnchor)) {
+      periodAnchor = getPrimeiroPeriodoPermitido();
+    }
 
     const { start, end } = App.getPeriodBounds(periodAnchor);
     monthLabel.textContent = App.getPeriodLabel(periodAnchor);
+    if (prevBtn) prevBtn.disabled = App.toKey(periodAnchor) === App.toKey(getPrimeiroPeriodoPermitido());
+    if (nextBtn) nextBtn.disabled = App.toKey(periodAnchor) === App.toKey(startOfMonth(addMonths(getComprovanteCicloAtual().start, COMPROVANTE_PERIODO_MESES - 1)));
     grid.innerHTML = "";
 
     App.DIAS_SEMANA_ABR.forEach((dia) => {
@@ -100,7 +165,10 @@
       const key = App.toKey(date);
       const util = App.isDiaUtil(date);
       const reg = registros[key];
-      const podeAbrirDetalhe = util || Boolean(reg);
+      const primeiroPeriodoPermitido = getPrimeiroPeriodoPermitido();
+      const boundsPrimeiroPeriodo = App.getPeriodBounds(primeiroPeriodoPermitido);
+      const podeRegistrar = date >= boundsPrimeiroPeriodo.start;
+      const podeAbrirDetalhe = (util && podeRegistrar) || Boolean(reg);
       const btn = document.createElement("button");
       btn.className = "cal-cell";
       btn.type = "button";
@@ -110,7 +178,7 @@
         btn.className += " filled";
         btn.className += reg.extraMin < 0 ? " filled-negative" : reg.extraMin === 0 ? " filled-neutral" : " filled-positive";
       }
-      if (util && !reg && key <= App.hojeKey) btn.className += " pending";
+      if (util && podeRegistrar && !reg && key <= App.hojeKey) btn.className += " pending";
       btn.textContent = date.getDate();
       if (podeAbrirDetalhe) btn.addEventListener("click", () => mostrarDetalhe(key, date));
       grid.appendChild(btn);
@@ -610,6 +678,12 @@
     const dataFmt = `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
 
     if (!reg) {
+      const primeiroPeriodoPermitido = getPrimeiroPeriodoPermitido();
+      const boundsPrimeiroPeriodo = App.getPeriodBounds(primeiroPeriodoPermitido);
+      if (date < boundsPrimeiroPeriodo.start) {
+        area.innerHTML = '<div class="detail-card"><div class="empty-msg">Esse dia ainda não está liberado no seu ciclo.</div></div>';
+        return;
+      }
       if (key > App.hojeKey) {
         area.innerHTML = '<div class="detail-card"><div class="empty-msg">Esse dia ainda não chegou.</div></div>';
         return;
@@ -697,11 +771,15 @@
   }
 
   App.on("prevMonth", "click", async () => {
-    periodAnchor = App.shiftPaymentAnchor(periodAnchor, -1);
+    const proximo = App.shiftPaymentAnchor(periodAnchor, -1);
+    if (!isDentroDoCicloAtual(proximo)) return;
+    periodAnchor = proximo;
     await renderCalendario();
   });
   App.on("nextMonth", "click", async () => {
-    periodAnchor = App.shiftPaymentAnchor(periodAnchor, 1);
+    const proximo = App.shiftPaymentAnchor(periodAnchor, 1);
+    if (!isDentroDoCicloAtual(proximo)) return;
+    periodAnchor = proximo;
     await renderCalendario();
   });
   App.on("periodSettingsBtn", "click", abrirConfiguracaoPeriodo);
@@ -721,6 +799,10 @@
 
   App.initShell({
     onReady: async () => {
+      periodAnchor = App.getCurrentPaymentAnchor();
+      if (!isDentroDoCicloAtual(periodAnchor)) {
+        periodAnchor = getPrimeiroPeriodoPermitido();
+      }
       mostrarViewCalendario();
       renderCabecalhoCalendario();
       await renderCalendario();
