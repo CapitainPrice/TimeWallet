@@ -8,8 +8,9 @@ Thumbs.db
 *.swp
 *.swo
 
-# OpenClaude
+# OpenClaude / Claude
 .openclaude/
+.claude/
 
 # Local config
 *.local

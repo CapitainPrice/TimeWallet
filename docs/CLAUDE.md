@@ -6,7 +6,7 @@
 
 App pessoal para controle de banco de horas de estágio. O usuário bate ponto de entrada fixo às **15:00** (horário do estágio) e usa o app pra registrar o horário de **saída**, calculando automaticamente quanto tempo extra foi feito (ou descontado, se saiu antes da hora). Foco 100% mobile: usado no celular, no fim do expediente, pra tirar uma foto do comprovante e já sair registrado.
 
-App está organizado sem build e sem framework, com HTML + CSS + JS puro abrindo direto no navegador (double-click ou `file://`). A entrada principal continua sendo o `index.html` na raiz, com estilos compartilhados em `assets/css/style.css`, script compartilhado em `assets/js/script.js` e telas separadas em `views/` (`calendario.html`, `banco-horas.html`, `splash.html`).
+App está organizado sem build e sem framework, com HTML + CSS + JS puro abrindo direto no navegador (double-click ou `file://`). A entrada principal continua sendo o `index.html` na raiz, com estilos compartilhados em `assets/css/style.css`, módulo compartilhado em `assets/js/shared.js` (`Store`, `calcularExtra`, `isDiaUtil`, `initShell`, geocoding, config de período etc.), scripts próprios de cada tela (`assets/js/script.js` pra home, `assets/js/calendario.js` e `assets/js/banco-horas.js`) e telas separadas em `views/` (`calendario.html`, `banco-horas.html`, `splash.html`). `views/base.html` existe no repo como template `{{content}}`/`{{root}}` mas não é referenciado por nenhuma tela atual — código morto/experimento, não usar como referência de estrutura.
 
 > **Registro de mudanças**: sempre que qualquer arquivo do projeto for alterado, registre a mudança em `logs/versions/` com um `.md` novo no topo contendo data, arquivos afetados e campos/itens modificados. Patch notes gerais ficam em `logs/patchNotes/`. Ao alterar comportamento, mantenha `docs/CLAUDE.md` e `docs/README.md` alinhados com esse histórico.
 
@@ -22,9 +22,9 @@ App está organizado sem build e sem framework, com HTML + CSS + JS puro abrindo
 1. **Splash screen** — ao abrir a raiz (`index.html`), o app mostra `views/splash.html` por 2 segundos com logo e nome da empresa, e depois redireciona de volta para a home na mesma sessão.
 2. **Tela inicial** — `div.sub-header` exibe a data completa no formato "Domingo, 30/08/2026" apenas na raiz/home. Card "Registro Saída" com botão de câmera, status visual de registro concluído sem exibir a imagem do comprovante, botão "Banco de Horas" (pílula bege com ícone de relógio).
 3. **Câmera in-app** (`getUserMedia`, não usa `<input capture>` puro porque no Android isso cai na galeria) — preview ao vivo, captura, confirmação ("Foto ficou boa?" → Mudar / Feito!), aí sim preenche horário atual, salva e captura geolocalização. Se a localização falhar por falta de HTTPS/permissão/timeout, a UI informa o motivo em vez de falhar silenciosamente.
-4. **Calendário** — navegação por **período configurável** (padrão 26→25), indicadores visuais por dia: hoje (anel verde + "hoje"), preenchido (fundo verde), pendente/sem registro (borda vermelha), fim de semana/feriado (cinza, não clicável). Clicar num dia útil sempre abre o detalhe/formulário; o card mostra o rótulo "Período" e traz um botão de engrenagem para alterar início e fim do período.
-5. **Detalhe do dia** — dentro do calendário, mostra horário de ponto (15:00 fixo), horário de saída, localização (link pro Google Maps com endereço quando disponível), tempo extra do dia, comprovante (miniatura + visualizar + baixar).
-6. **Banco de Horas** — saldo total do período atual, lista paginada de registros, rótulo "Período" acima do intervalo e botão "Exportar relatório" com ícone de exportação.
+4. **Calendário** — navegação por **período configurável** (padrão 26→25, editável via botão de engrenagem `periodSettingsBtn` que abre o `periodModal`, salvo em `localStorage`), indicadores visuais por dia: hoje (classe `today`), preenchido (`filled` + `filled-negative/neutral/positive`), pendente/sem registro (classe `pending`, borda vermelha — **só aplica pra dias passados, `key < hojeKey`; hoje sem registro nunca fica marcado como pendente, só como "hoje"**), fim de semana/feriado (`off`, cinza, não clicável). Clicar num dia útil sempre abre o detalhe/formulário de registro manual (com modal de seleção de horário); o card mostra o rótulo "Período" e o botão de engrenagem pra alterar início e fim do período. Uma trava adicional de 6 meses a partir do primeiro login (`COMPROVANTE_PERIODO_MESES`) limita quais períodos ficam navegáveis/baixáveis pro Banco de Horas.
+5. **Detalhe do dia** — dentro do calendário, mostra horário de ponto (15:00 fixo), horário de saída, localização (link pro Google Maps + endereço resolvido por **geocodificação reversa** via Nominatim/OSM, cacheado em memória, com fallback pra lat/lng cru se a API falhar), tempo extra do dia, comprovante (miniatura + visualizar + baixar).
+6. **Banco de Horas** — saldo total do período atual, lista paginada de registros (`REG_POR_PAGINA = 6`), rótulo "Período" acima do intervalo, botão "Exportar relatório" com ícone de exportação (renderiza em Canvas) e botão "Baixar comprovantes do período" que gera um ZIP (via JSZip) com os comprovantes do período selecionado.
 7. **Perfil do usuário** — menu do usuário com visual mais moderno: avatar/cartão arredondado, cabeçalho mais rico, estado de convidado com badge e CTA de sincronização via Google.
 
 ## Regra de cálculo do tempo extra
@@ -32,7 +32,7 @@ App está organizado sem build e sem framework, com HTML + CSS + JS puro abrindo
 Ponto de referência fixo: **15:00**.
 
 - Saída **antes das 15:00** → desconta. `extra = saída − 15:00` (negativo). Card fica **vermelho**.
-- Saída entre **15:00 e 15:10** (tolerância) → **neutro**, não conta nada (`extra = 0`). Card fica **cinza claro** (`hero-muted`).
+- Saída entre **15:00 e 15:10** (tolerância) → **neutro**, não conta nada (`extra = 0`). Card fica **verde-oliva acinzentado** (`hero-muted`, `#7B846D` com texto branco).
 - Saída **a partir das 15:11** → soma tempo extra, descontando a tolerância. `extra = saída − 15:10`. Card fica **verde**.
 
 Essa regra vale em todo lugar que mostra tempo extra: card da tela inicial, detalhe do dia no calendário e saldo total na tela "Banco de Horas" (aplicado ao saldo somado do período — se o total der exatamente 0, também fica cinza).
@@ -74,6 +74,7 @@ users/{uid}/
 - **Workflow**: `.github/workflows/deploy.yml` — roda a cada push na `main`
 - **Publica**: raiz do repositório (onde está o `index.html`)
 - **URL**: `https://capitainprice.github.io/TimeWallet/`
+- **Geração do `config.js`**: o workflow lê o secret `FIREBASE_CONFIG` e gera `config.js` via script Node inline. Aceita tanto JSON puro quanto um snippet colado direto do console do Firebase (`const firebaseConfig = {...}` ou `window.FIREBASE_CONFIG = {...}`), normaliza espaços nos campos e valida que todos os campos obrigatórios (`apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`) estão presentes antes de publicar.
 - **Passo a passo**:
   1. Edite `index.html`
   2. `git add index.html`

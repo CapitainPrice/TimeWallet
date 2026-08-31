@@ -14,11 +14,13 @@ App pessoal para controle de banco de horas com foco mobile. O usuário registra
 - **Resumo acumulado do ciclo** com total de registros, extras, descontos e saldo acumulado
 - **Histórico de registros** paginado no Banco de Horas (**6 registros por página**)
 - **Select de períodos do ciclo** respeitando a configuração real do período do app (ex.: `26/08/2026 – 25/09/2026`)
+- **Configuração do período** via botão de engrenagem no Calendário (`periodSettingsBtn`), que abre modal pra trocar o dia de início/fim do ciclo (padrão 26→25), salvo em `localStorage`
 - **Download dos comprovantes do período em ZIP** com nome intuitivo
-- **Calendário limitado ao ciclo atual** e à data de liberação baseada no primeiro login
-- **Registro manual no calendário** apenas para dias liberados dentro do ciclo
+- **Calendário limitado ao ciclo atual** e à data de liberação baseada no primeiro login (trava adicional de 6 meses pra navegação/download de comprovantes)
+- **Registro manual no calendário** apenas para dias liberados dentro do ciclo, com modal de seleção de horário
 - **Login com Google + sincronização no Firebase/Firestore**
 - **Fallback em `localStorage`** quando não houver autenticação
+- **Geocodificação reversa** (Nominatim/OSM) resolve endereço a partir de lat/lng, com cache em memória
 - **Splash screen**, navegação mobile e exportação de relatório em imagem
 
 ## Regras principais do app
@@ -73,7 +75,7 @@ O deploy é feito pelo GitHub Actions ao enviar mudanças para a branch `main`.
 - GitHub Pages configurado para **GitHub Actions**
 - Secret `FIREBASE_CONFIG` configurado no repositório
 
-O workflow publica um `config.js` em tempo de deploy a partir do secret do Firebase.
+O workflow publica um `config.js` em tempo de deploy a partir do secret do Firebase. O script aceita tanto JSON puro quanto um snippet `firebaseConfig = {...}`/`window.FIREBASE_CONFIG = {...}` colado direto do console do Firebase, validando os campos obrigatórios.
 
 ## Desenvolvimento local
 

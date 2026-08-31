@@ -178,7 +178,7 @@
         btn.className += " filled";
         btn.className += reg.extraMin < 0 ? " filled-negative" : reg.extraMin === 0 ? " filled-neutral" : " filled-positive";
       }
-      if (util && podeRegistrar && !reg && key <= App.hojeKey) btn.className += " pending";
+      if (util && podeRegistrar && !reg && key < App.hojeKey) btn.className += " pending";
       btn.textContent = date.getDate();
       if (podeAbrirDetalhe) btn.addEventListener("click", () => mostrarDetalhe(key, date));
       grid.appendChild(btn);
