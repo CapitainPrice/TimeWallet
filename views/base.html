@@ -1,0 +1,64 @@
+<div class="app">
+  <div class="top-bar">
+    <a class="app-logo" href="{{homeHref}}" aria-label="Ir para tela inicial">
+      <img src="{{root}}/assets/timewallet_logo_header.svg" alt="TimeWallet">
+    </a>
+  </div>
+
+  <div class="sub-header">
+    <div class="sub-header-left">
+      <button class="sub-header-cal" id="primaryNavBtn" type="button" aria-label="{{primaryActionLabel}}">
+        {{primaryActionIcon}}
+      </button>
+      <span class="sub-header-date" id="dataPrincipal">—</span>
+    </div>
+    <div class="user-menu" id="userMenu">
+      <button class="user-btn" id="btnUsuario" type="button" aria-label="Usuário" aria-expanded="false" aria-haspopup="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      </button>
+      <div class="user-dropdown" id="userDropdown" role="menu" hidden>
+        <div class="dropdown-header" id="dropdownHeader"></div>
+        <div class="dropdown-divider"></div>
+        <button class="dropdown-item" id="dropdownSignIn" role="menuitem" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span>Entrar com Google</span>
+        </button>
+        <button class="dropdown-item" id="dropdownSignOut" role="menuitem" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Sair</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <main class="page-main" id="pageContent">{{content}}</main>
+
+  <div class="app-footer">Desenvolvido por Guilherme Gonçalves.</div>
+
+  <div class="toast" id="toast">Salvo!</div>
+
+  <div class="cam-modal" id="camModal">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <img id="camPreview" style="display:none;">
+    <div class="cam-question" id="camQuestion" style="display:none;">Foto ficou boa?</div>
+    <div class="cam-actions" id="camActionsLive">
+      <button class="fa-btn cam-cancel" id="camCancelar" type="button">Cancelar</button>
+      <button class="btn" id="camCapturar" type="button">Capturar foto</button>
+    </div>
+    <div class="cam-actions" id="camActionsPreview" style="display:none;">
+      <button class="fa-btn cam-cancel" id="camMudar" type="button">Mudar</button>
+      <button class="btn" id="camFeito" type="button">Feito!</button>
+    </div>
+  </div>
+  <canvas id="camCanvas" style="display:none;"></canvas>
+
+  <div class="img-modal" id="imgModal">
+    <button class="icon-btn" id="closeImgModal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+    <img id="imgModalPic" alt="Comprovante">
+  </div>
+</div>
