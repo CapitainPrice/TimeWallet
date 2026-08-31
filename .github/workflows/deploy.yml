@@ -25,9 +25,40 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Create config.js from secret
+        env:
+          FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
         run: |
-          echo '${{ secrets.FIREBASE_CONFIG }}' > firebase-config.json
-          node -e "const fs = require('fs'); const config = JSON.parse(fs.readFileSync('firebase-config.json', 'utf8')); console.log('window.FIREBASE_CONFIG = ' + JSON.stringify(config) + ';');" > config.js
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const raw = process.env.FIREBASE_CONFIG;
+          if (!raw) {
+            throw new Error('Missing FIREBASE_CONFIG secret');
+          }
+
+          const config = JSON.parse(raw);
+          const noWhitespaceKeys = [
+            'apiKey',
+            'authDomain',
+            'projectId',
+            'storageBucket',
+            'messagingSenderId',
+            'appId',
+          ];
+
+          noWhitespaceKeys.forEach((key) => {
+            if (typeof config[key] === 'string') {
+              config[key] = config[key].replace(/\s+/g, '');
+            }
+          });
+
+          const missingKeys = noWhitespaceKeys.filter((key) => !config[key]);
+          if (missingKeys.length > 0) {
+            throw new Error(`Invalid FIREBASE_CONFIG secret. Missing: ${missingKeys.join(', ')}`);
+          }
+
+          fs.writeFileSync('config.js', `window.FIREBASE_CONFIG = ${JSON.stringify(config)};\n`);
+          NODE
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
