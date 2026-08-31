@@ -36,7 +36,18 @@ jobs:
             throw new Error('Missing FIREBASE_CONFIG secret');
           }
 
-          const config = JSON.parse(raw);
+          let config;
+          try {
+            config = JSON.parse(raw);
+          } catch {
+            const normalized = raw.trim();
+            const objectMatch = normalized.match(/\{[\s\S]*\}/);
+            if (!objectMatch) {
+              throw new Error('Invalid FIREBASE_CONFIG secret. Expected JSON object or Firebase config snippet.');
+            }
+            config = JSON.parse(objectMatch[0]);
+          }
+
           const noWhitespaceKeys = [
             'apiKey',
             'authDomain',
