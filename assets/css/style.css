@@ -424,8 +424,8 @@ body.modal-open{overflow:hidden;}
 
 .app-footer{text-align:center;font-size:11px;color:var(--muted);padding:4px 20px 16px;margin-top:2px;}
 .splash-app{justify-content:center;box-shadow:none;}
-.splash-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px 24px;background:radial-gradient(circle at top,#eef4e3 0%,#f7f5ee 52%,#f7f5ee 100%);text-align:center;}
-.splash-logo{width:min(280px,80vw);height:auto;display:block;filter:drop-shadow(0 14px 30px rgba(55,82,21,.16));}
+.splash-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px 24px 96px;background:radial-gradient(circle at top,#eef4e3 0%,#f7f5ee 52%,#f7f5ee 100%);text-align:center;}
+.splash-logo{width:min(390px,92vw);height:auto;display:block;filter:drop-shadow(0 14px 30px rgba(55,82,21,.16));}
 .splash-company{font-family:Georgia,"Times New Roman",Cambria,serif;font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--primary-dark);}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--primary-dark);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;white-space:nowrap;}
 .toast.show{opacity:1;}
