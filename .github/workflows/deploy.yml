@@ -30,24 +30,39 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('fs');
+          const vm = require('vm');
 
           const raw = process.env.FIREBASE_CONFIG;
           if (!raw) {
             throw new Error('Missing FIREBASE_CONFIG secret');
           }
 
-          let config;
-          try {
-            config = JSON.parse(raw);
-          } catch {
-            const normalized = raw.trim();
-            const objectMatch = normalized.match(/\{[\s\S]*\}/);
+          function parseFirebaseConfig(value) {
+            try {
+              return JSON.parse(value);
+            } catch {}
+
+            const sandbox = { window: {} };
+            try {
+              vm.runInNewContext(value, sandbox);
+            } catch {}
+
+            if (sandbox.window?.FIREBASE_CONFIG && typeof sandbox.window.FIREBASE_CONFIG === 'object') {
+              return sandbox.window.FIREBASE_CONFIG;
+            }
+            if (sandbox.firebaseConfig && typeof sandbox.firebaseConfig === 'object') {
+              return sandbox.firebaseConfig;
+            }
+
+            const objectMatch = String(value).trim().match(/\{[\s\S]*\}/);
             if (!objectMatch) {
               throw new Error('Invalid FIREBASE_CONFIG secret. Expected JSON object or Firebase config snippet.');
             }
-            config = JSON.parse(objectMatch[0]);
+
+            return vm.runInNewContext(`(${objectMatch[0]})`);
           }
 
+          const config = parseFirebaseConfig(raw);
           const noWhitespaceKeys = [
             'apiKey',
             'authDomain',
