@@ -26,8 +26,6 @@
   let comprovanteBase64 = null;
   let comprovanteNome = null;
   let comprovanteLocalizacao = null;
-  let camStream = null;
-  let fotoCapturada = null;
   let registroHojeTravado = false;
   let timerViradaDia = null;
 
@@ -147,12 +145,12 @@
 
     if (min === 0) {
       box.classList.add("hero-muted");
-      box.style.background = "#7B846D";
+      box.style.background = "#AEB49E";
       box.style.color = "#fff";
       tempoExtraLabel.textContent = "Neutro";
     } else {
       box.classList.remove("hero-muted");
-      box.style.background = "#7B846D";
+      box.style.background = "#AEB49E";
       box.style.color = "#fff";
       tempoExtraLabel.textContent = min < 0 ? "Desconto" : "Tempo extra";
     }
@@ -275,78 +273,15 @@
       App.mostrarToast("Você já registrou sua saída hoje.");
       return;
     }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    const resultado = await App.abrirCameraModal();
+    if (resultado === "unsupported") {
       App.byId("comprovanteCamera")?.click();
       return;
     }
+    if (!resultado) return;
 
-    try {
-      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-    } catch {
-      App.byId("comprovanteCamera")?.click();
-      return;
-    }
-
-    const video = App.byId("camVideo");
-    const modal = App.byId("camModal");
-    if (!video || !modal) return;
-    video.srcObject = camStream;
-    mostrarLiveCamera();
-    modal.classList.add("show");
-  }
-
-  function mostrarLiveCamera() {
-    App.byId("camVideo")?.style.setProperty("display", "block");
-    App.byId("camPreview")?.style.setProperty("display", "none");
-    App.byId("camQuestion")?.style.setProperty("display", "none");
-    App.byId("camActionsLive")?.style.setProperty("display", "flex");
-    App.byId("camActionsPreview")?.style.setProperty("display", "none");
-  }
-
-  function fecharCamera() {
-    App.byId("camModal")?.classList.remove("show");
-    if (camStream) {
-      camStream.getTracks().forEach((track) => track.stop());
-      camStream = null;
-    }
-    fotoCapturada = null;
-    mostrarLiveCamera();
-  }
-
-  function capturarFoto() {
-    const video = App.byId("camVideo");
-    const canvas = App.byId("camCanvas");
-    const preview = App.byId("camPreview");
-    if (!video || !canvas || !preview) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(video, 0, 0);
-    fotoCapturada = canvas.toDataURL("image/jpeg", 0.85);
-
-    ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
-    ctx.clearRect(-canvas.width, 0, canvas.width, canvas.height);
-    ctx.drawImage(video, 0, 0);
-    const fotoPreview = canvas.toDataURL("image/jpeg", 0.85);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    preview.src = fotoPreview;
-    App.byId("camVideo")?.style.setProperty("display", "none");
-    preview.style.display = "block";
-    App.byId("camQuestion")?.style.setProperty("display", "block");
-    App.byId("camActionsLive")?.style.setProperty("display", "none");
-    App.byId("camActionsPreview")?.style.setProperty("display", "flex");
-  }
-
-  async function confirmarFoto() {
-    const foto = fotoCapturada;
-    fecharCamera();
-    if (!foto || registroHojeTravado) return;
     comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(getHojeKey(), "foto.jpg") : `foto_${Date.now()}.jpg`;
-    comprovanteBase64 = foto;
+    comprovanteBase64 = resultado;
     exibirComprovante(comprovanteBase64);
     preencherHorarioAtual();
     const salvou = await salvarRegistroHoje();
@@ -368,10 +303,6 @@
 
   App.on("btnRegistro", "click", App.goToRegistro);
   App.on("btnCamera", "click", abrirCamera);
-  App.on("camCancelar", "click", fecharCamera);
-  App.on("camCapturar", "click", capturarFoto);
-  App.on("camMudar", "click", mostrarLiveCamera);
-  App.on("camFeito", "click", confirmarFoto);
   App.on("comprovanteCamera", "change", (e) => {
     const file = e.target.files[0];
     if (file) processarArquivo(file);

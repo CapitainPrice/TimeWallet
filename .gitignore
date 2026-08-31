@@ -11,6 +11,7 @@ Thumbs.db
 # OpenClaude / Claude
 .openclaude/
 .claude/
+.playwright-mcp/
 
 # Local config
 *.local

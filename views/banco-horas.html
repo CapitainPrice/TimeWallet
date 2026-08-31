@@ -35,7 +35,7 @@
           <div class="dropdown-header" id="dropdownHeader"></div>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item" id="dropdownSignIn" role="menuitem" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path></svg>
             <span>Entrar com Google</span>
           </button>
           <button class="dropdown-item" id="dropdownSignOut" role="menuitem" hidden>
@@ -75,51 +75,122 @@
         </div>
       </div>
 
-      <div class="cal-card reg-card" style="margin-top:24px;">
-        <div class="reg-export-copy reg-history-copy">
-          <div class="reg-export-title">Histórico de registros</div>
-          <div class="reg-export-text">Consulte os registros salvos dentro do período selecionado do ciclo atual.</div>
+      <div class="reg-export-card" style="margin-top:24px;">
+        <div class="reg-export-copy">
+          <div class="reg-export-title">Visualização</div>
+          <div class="reg-export-text">Escolha o que exibir nesta tela.</div>
         </div>
-        <div class="period-label period-label-centered">Período</div>
-        <div class="cal-nav">
-          <button id="regPrevPeriod">‹</button>
-          <div class="month" id="regPeriodoLabel">—</div>
-          <button id="regNextPeriod">›</button>
+        <div class="visualizacao-toggle">
+          <button type="button" class="visualizacao-opcao is-active" id="visOpcaoRegistros" data-value="registros">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="7" y1="9" x2="17" y2="9"></line><line x1="7" y1="13" x2="17" y2="13"></line><line x1="7" y1="17" x2="13" y2="17"></line></svg>
+            <span>Registros</span>
+          </button>
+          <button type="button" class="visualizacao-opcao" id="visOpcaoBaixas" data-value="baixas">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1"></path><path d="M21 12h-4a2 2 0 0 0 0 4h4v-4z"></path></svg>
+            <span>Baixas</span>
+          </button>
         </div>
-        <div class="reg-header">
-          <span class="col-dia">Dia</span>
-          <span class="col-ponto">Ponto</span>
-          <span class="col-saida">Saída</span>
-          <span class="col-local">Localização</span>
-          <span class="col-horas">Saldo</span>
-        </div>
-        <div class="reg-tabela" id="regTabela"></div>
-        <div class="reg-paginacao" id="regPaginacao"></div>
       </div>
 
-      <div class="reg-export-card">
-        <div class="reg-export-copy">
-          <div class="reg-export-title">Comprovantes do período</div>
-          <div class="reg-export-text" id="comprovantePeriodoTexto">Selecione um dos 6 períodos do ciclo atual.</div>
+      <div id="viewRegistros">
+        <div class="cal-card reg-card" style="margin-top:24px;">
+          <div class="reg-export-copy reg-history-copy">
+            <div class="reg-export-title">Histórico de registros</div>
+            <div class="reg-export-text">Consulte os registros salvos dentro do período selecionado do ciclo atual.</div>
+          </div>
+          <div class="period-label period-label-centered">Período</div>
+          <div class="cal-nav">
+            <button id="regPrevPeriod">‹</button>
+            <div class="month" id="regPeriodoLabel">—</div>
+            <button id="regNextPeriod">›</button>
+          </div>
+          <div class="reg-header">
+            <span class="col-dia">Dia</span>
+            <span class="col-saida">Saída</span>
+            <span class="col-local">Localização</span>
+            <span class="col-horas">Saldo</span>
+          </div>
+          <div class="reg-tabela" id="regTabela"></div>
+          <div class="reg-paginacao" id="regPaginacao"></div>
         </div>
-        <div class="period-select-grid reg-download-grid">
-          <label class="period-field" for="comprovantePeriodoSelect">
-            <span>Período de 6 meses</span>
-            <select class="period-select" id="comprovantePeriodoSelect"></select>
-          </label>
+
+        <div class="reg-export-card">
+          <div class="reg-export-copy">
+            <div class="reg-export-title">Comprovantes do período</div>
+            <div class="reg-export-text" id="comprovantePeriodoTexto">Selecione um dos 12 períodos do ano.</div>
+          </div>
+          <div class="period-select-grid reg-download-grid">
+            <label class="period-field" for="comprovantePeriodoSelect">
+              <span>Período do ano</span>
+              <select class="period-select" id="comprovantePeriodoSelect"></select>
+            </label>
+          </div>
+          <button class="btn reg-export-btn" id="baixarComprovantesBtn" type="button">
+            <span class="btn-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+            </span>
+            Baixar comprovantes do período
+          </button>
         </div>
-        <button class="btn reg-export-btn" id="baixarComprovantesBtn" type="button">
-          <span class="btn-ico">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
-          </span>
-          Baixar comprovantes do período
-        </button>
+      </div>
+
+      <div id="viewBaixas" hidden>
+        <div class="reg-export-card" style="margin-top:24px;">
+          <div class="reg-export-copy">
+            <div class="reg-export-title">Histórico de baixas</div>
+            <div class="reg-export-text">Consulte as baixas de saldo já registradas, com a foto e o comprovante gerado.</div>
+          </div>
+
+          <div class="cal-nav" id="baixasNav" hidden>
+            <button id="baixaPrevBtn" type="button">‹</button>
+            <div class="month" id="baixaIndicador">—</div>
+            <button id="baixaNextBtn" type="button">›</button>
+          </div>
+
+          <div class="reg-tabela" id="baixasHistorico"></div>
+        </div>
+
+        <div class="reg-export-card">
+          <div class="reg-export-copy">
+            <div class="reg-export-title">Baixa de saldo</div>
+            <div class="reg-export-text" id="baixaSaldoTexto">Saldo atual: 0min</div>
+          </div>
+          <button class="btn reg-export-btn" id="baixaSaldoBtn" type="button">
+            <span class="btn-ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5L16 9"></path></svg>
+            </span>
+            Dar baixa no saldo
+          </button>
+          <input type="file" id="baixaCamera" accept="image/*" capture="environment" hidden>
+        </div>
       </div>
 
     </main>
 
     <div class="app-footer">Desenvolvido por Guilherme Gonçalves.</div>
     <div class="toast" id="toast">Salvo!</div>
+  </div>
+
+  <div class="cam-modal" id="camModal">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <img id="camPreview" style="display:none;">
+    <div class="cam-question" id="camQuestion" style="display:none;">Foto ficou boa?</div>
+    <div class="cam-actions" id="camActionsLive">
+      <button class="fa-btn cam-cancel" id="camCancelar" type="button">Cancelar</button>
+      <button class="btn" id="camCapturar" type="button" style="margin-top:0;">Capturar foto</button>
+    </div>
+    <div class="cam-actions" id="camActionsPreview" style="display:none;">
+      <button class="fa-btn cam-cancel" id="camMudar" type="button">Mudar</button>
+      <button class="btn" id="camFeito" type="button" style="margin-top:0;">Feito!</button>
+    </div>
+  </div>
+  <canvas id="camCanvas" style="display:none;"></canvas>
+
+  <div class="img-modal" id="imgModal">
+    <button class="icon-btn" id="closeImgModal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+    <img id="imgModalPic" alt="Comprovante">
   </div>
 
   <script src="../assets/js/shared.js"></script>

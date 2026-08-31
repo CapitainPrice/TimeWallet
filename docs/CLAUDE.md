@@ -10,6 +10,42 @@ App está organizado sem build e sem framework, com HTML + CSS + JS puro abrindo
 
 > **Registro de mudanças**: sempre que qualquer arquivo do projeto for alterado, registre a mudança em `logs/versions/` com um `.md` novo no topo contendo data, arquivos afetados e campos/itens modificados. Patch notes gerais ficam em `logs/patchNotes/`. Ao alterar comportamento, mantenha `docs/CLAUDE.md` e `docs/README.md` alinhados com esse histórico.
 
+## Regras (índice único)
+
+> Toda regra de negócio ou de estilo nova/alterada entra aqui — mesmo que o detalhe completo também more em outra seção deste arquivo. Este é o lugar único de consulta rápida.
+
+**Tipografia**
+- Georgia (serifada) **só** em títulos: saudação da home, títulos de tela (`hero-title`), títulos de card (`reg-export-title`, `detail-card-title`), sub-títulos de seção (`period-label-centered` — "Período", `legend-title` — "Legenda"), títulos de modal (`period-sheet-title`), nome da empresa na splash.
+- Sistema sans-serif (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif`) em todo o resto: labels, botões, inputs e **selects** — inclusive o `<select>` nativo, que por padrão herdaria a fonte do navegador em vez da do app (por isso `button,input,select{font:inherit;}` no CSS).
+
+**Cálculo do tempo extra** (ponto fixo 15:00)
+- Saída antes de 15:00 → desconta.
+- Saída entre 15:00–15:10 → neutro (zero).
+- Saída a partir de 15:11 → soma extra, descontando a tolerância.
+- Vale em todo lugar que mostra tempo extra (home, detalhe do dia, saldo do Banco de Horas).
+
+**Dias úteis / feriados**
+- Sábado, domingo e feriados nacionais = não úteis, não clicáveis, não contam pendência.
+- Feriados móveis calculados via algoritmo de Páscoa (Gauss) — funciona pra qualquer ano.
+
+**Persistência**
+- Autenticado → Firestore; não autenticado → localStorage. Migração automática no primeiro login.
+- Firestore travado por `request.auth.uid == userId` — cada usuário só acessa os próprios dados.
+
+**Período de pagamento**
+- Configurável (padrão 26→25), editável em `periodModal`, salvo em localStorage.
+- **Calendário**: trava navegação/registro a uma janela de 6 meses a partir do primeiro login (`App.getComprovanteCicloAtual`, `COMPROVANTE_PERIODO_MESES`).
+- **Banco de Horas** (cards "Comprovantes do período" e "Histórico de baixas"): usa ano civil fixo — 12 períodos, janeiro a dezembro, sempre recalculado a partir da data de hoje (sem depender de primeiro login, sem nada salvo — reseta sozinho a cada virada de ano).
+
+**Baixa de saldo** (Banco de Horas)
+- Ao confirmar: tira foto (câmera ou galeria), pede confirmação ("tem certeza") **depois** de já ter a foto (nunca antes — diálogo bloqueante antes da câmera quebra a permissão do navegador), salva `{data, horário, saldoBaixado, foto}` e gera uma imagem de comprovante no mesmo estilo do relatório (campos: Data, Localização, Saldo resgatado, Nome do usuário).
+- A partir da data/hora da baixa, o "Saldo acomulado" do ano zera e passa a somar só registros **depois** da baixa. Registros anteriores continuam visíveis no Histórico de registros (não são apagados), só param de contar no saldo corrente.
+- Baixa não captura localização (só data, horário, saldo, nome do usuário).
+
+**Segurança**
+- Câmera/geolocalização exigem contexto seguro (HTTPS ou localhost); em `file://` cai pro fallback de input comum sem localização.
+- Nunca injetar texto vindo de fonte externa (endereço de geocoding via OSM, nome/foto de conta Google) em `innerHTML` sem escapar antes — evita XSS armazenado.
+
 ## Identidade visual
 
 - **Paleta**: verde-oliva como cor primária (`#4A701C`, escuro `#375215`, claro `#E8F0DD`), fundo creme (`#F7F5EE`), texto quase-preto esverdeado (`#20291A`), texto secundário verde-acinzentado (`#7A8570`), vermelho de alerta (`#B3261E`), bege caqui como cor de destaque secundária (`#B9A47C` no botão "Banco de Horas", `#C9B589`/`#EFF1EA` nos estados neutros).

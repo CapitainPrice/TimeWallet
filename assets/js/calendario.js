@@ -2,9 +2,13 @@
   const App = window.TimeWallet;
   if (!App) return;
 
-  const COMPROVANTE_PERIODO_MESES = 6;
-  const COMPROVANTE_CICLO_KEY_PREFIX = "bancoHoras_comprovantes_primeiro_login";
   let periodAnchor = App.getCurrentPaymentAnchor();
+
+  function splitComprovanteResumo(resumo) {
+    const match = String(resumo || "").match(/^comprovante_([^_]+)_(.+)$/);
+    if (!match) return null;
+    return [`comprovante_`, `${match[1]}_`, match[2].replace(/_/g, " ")];
+  }
 
   function mostrarViewCalendario() {
     const calendarView = App.byId("calendarView");
@@ -36,58 +40,15 @@
     if (el) el.textContent = App.formatarDataPrincipal(data);
   }
 
-  function startOfMonth(date) {
-    return new Date(date.getFullYear(), date.getMonth(), 1);
-  }
-
-  function addMonths(date, months) {
-    return new Date(date.getFullYear(), date.getMonth() + months, 1);
-  }
-
-  function getComprovanteCicloKey() {
-    const uid = App.Store?.getCurrentUser?.()?.uid || "guest";
-    return `${COMPROVANTE_CICLO_KEY_PREFIX}_${uid}`;
-  }
-
-  function getComprovanteCicloBase() {
-    const key = getComprovanteCicloKey();
-    const salvo = localStorage.getItem(key);
-    if (salvo) {
-      const dataSalva = new Date(`${salvo}T00:00:00`);
-      if (!Number.isNaN(dataSalva.getTime())) return dataSalva;
-    }
-    const hoje = new Date();
-    localStorage.setItem(key, App.toKey(hoje));
-    return hoje;
-  }
-
-  function setComprovanteCicloBase(date) {
-    localStorage.setItem(getComprovanteCicloKey(), App.toKey(date));
-  }
-
-  function getComprovanteCicloAtual() {
-    let inicio = startOfMonth(getComprovanteCicloBase());
-    let fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
-    const hoje = new Date();
-
-    while (hoje > fim) {
-      inicio = addMonths(inicio, COMPROVANTE_PERIODO_MESES);
-      fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
-      setComprovanteCicloBase(inicio);
-    }
-
-    return { start: inicio, end: fim };
-  }
-
   function getPrimeiroPeriodoPermitido() {
-    return startOfMonth(getComprovanteCicloAtual().start);
+    return App.startOfMonth(App.getComprovanteCicloAtual().start);
   }
 
   function isDentroDoCicloAtual(anchor) {
-    const ciclo = getComprovanteCicloAtual();
-    const inicio = startOfMonth(ciclo.start);
-    const fim = startOfMonth(addMonths(ciclo.start, COMPROVANTE_PERIODO_MESES - 1));
-    const atual = startOfMonth(anchor);
+    const ciclo = App.getComprovanteCicloAtual();
+    const inicio = App.startOfMonth(ciclo.start);
+    const fim = App.startOfMonth(App.addMonths(ciclo.start, App.COMPROVANTE_PERIODO_MESES - 1));
+    const atual = App.startOfMonth(anchor);
     return atual >= inicio && atual <= fim;
   }
 
@@ -141,7 +102,7 @@
     const { start, end } = App.getPeriodBounds(periodAnchor);
     monthLabel.textContent = App.getPeriodLabel(periodAnchor);
     if (prevBtn) prevBtn.disabled = App.toKey(periodAnchor) === App.toKey(getPrimeiroPeriodoPermitido());
-    if (nextBtn) nextBtn.disabled = App.toKey(periodAnchor) === App.toKey(startOfMonth(addMonths(getComprovanteCicloAtual().start, COMPROVANTE_PERIODO_MESES - 1)));
+    if (nextBtn) nextBtn.disabled = App.toKey(periodAnchor) === App.toKey(App.startOfMonth(App.addMonths(App.getComprovanteCicloAtual().start, App.COMPROVANTE_PERIODO_MESES - 1)));
     grid.innerHTML = "";
 
     App.DIAS_SEMANA_ABR.forEach((dia) => {
@@ -194,158 +155,11 @@
     if (totalLabel) totalLabel.textContent = `Saldo do período (${App.MESES[end.getMonth()]})`;
   }
 
-  function getLocalizacaoTexto(localizacao) {
-    if (!localizacao) return "Não registrada";
-    if (localizacao.address) return localizacao.address;
-    if (localizacao.endereco) return localizacao.endereco;
-    return `${localizacao.lat.toFixed(5)}, ${localizacao.lng.toFixed(5)}`;
-  }
-
-  function getComprovanteResumo(key, reg) {
-    if (App.getComprovanteInfo) {
-      return App.getComprovanteInfo(key, reg?.comprovanteNome).resumo;
-    }
-    return reg?.comprovanteNome || "comprovante";
-  }
-
-  function fitTextWithEllipsis(ctx, text, maxWidth) {
-    let value = String(text || "");
-    if (ctx.measureText(value).width <= maxWidth) return value;
-    while (value.length > 1 && ctx.measureText(`${value}…`).width > maxWidth) {
-      value = value.slice(0, -1);
-    }
-    return `${value}…`;
-  }
-
-  function breakLongToken(ctx, token, maxWidth) {
-    const parts = [];
-    let current = "";
-    for (const char of String(token || "")) {
-      const test = current + char;
-      if (current && ctx.measureText(test).width > maxWidth) {
-        parts.push(current);
-        current = char;
-      } else {
-        current = test;
-      }
-    }
-    if (current) parts.push(current);
-    return parts.length ? parts : [String(token || "—")];
-  }
-
-  function wrapText(ctx, text, maxWidth, maxLines = 2) {
-    const tokens = String(text || "—").trim().split(/\s+/).filter(Boolean);
-    if (!tokens.length) return ["—"];
-
-    const lines = [];
-    let current = "";
-
-    tokens.forEach((token) => {
-      const parts = ctx.measureText(token).width > maxWidth ? breakLongToken(ctx, token, maxWidth) : [token];
-      parts.forEach((part, index) => {
-        const separator = current ? (index === 0 ? " " : "") : "";
-        const test = `${current}${separator}${part}`;
-        if (!current || ctx.measureText(test).width <= maxWidth) {
-          current = test;
-          return;
-        }
-        lines.push(current);
-        current = part;
-      });
-    });
-
-    if (current) lines.push(current);
-    if (lines.length <= maxLines) return lines;
-
-    const limited = lines.slice(0, maxLines);
-    limited[maxLines - 1] = fitTextWithEllipsis(ctx, limited[maxLines - 1], maxWidth);
-    if (!limited[maxLines - 1].endsWith("…")) {
-      limited[maxLines - 1] = fitTextWithEllipsis(ctx, `${limited[maxLines - 1]}…`, maxWidth);
-    }
-    return limited;
-  }
-
-  function drawRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
-    ctx.closePath();
-    if (fillStyle) {
-      ctx.fillStyle = fillStyle;
-      ctx.fill();
-    }
-    if (strokeStyle) {
-      ctx.strokeStyle = strokeStyle;
-      ctx.stroke();
-    }
-  }
-
-  async function drawLogo(ctx, totalW, padding) {
-    try {
-      const response = await fetch("../assets/timewallet_logo_header_black.svg");
-      const svg = await response.text();
-      const logoSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = logoSrc;
-      });
-      const maxW = 620;
-      const ratio = img.width / img.height;
-      const width = maxW;
-      const height = width / ratio;
-      ctx.drawImage(img, (totalW - width) / 2, padding, width, height);
-      return height;
-    } catch {
-      return 0;
-    }
-  }
-
-  function drawMetricCard(ctx, x, y, width, height, label, value, accent) {
-    drawRoundedRect(ctx, x, y, width, height, 22, "#FFFFFF", "#E6EBDB");
-    ctx.fillStyle = "#7A8570";
-    ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(label, x + 18, y + 24);
-    ctx.fillStyle = accent;
-    ctx.font = "700 28px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(String(value), x + 18, y + 58);
-  }
-
-  function drawCellText(ctx, value, x, y, width, height, align, color, font, maxLines = 2) {
-    ctx.fillStyle = color;
-    ctx.font = font;
-    ctx.textAlign = align;
-    const pad = 10;
-    const maxW = Math.max(24, width - pad * 2);
-    const lines = wrapText(ctx, value, maxW, maxLines);
-    const lineHeight = 14;
-    const totalHeight = lines.length * lineHeight;
-    const baseX = align === "left" ? x + pad : align === "right" ? x + width - pad : x + width / 2;
-    let currentY = y + (height - totalHeight) / 2 + 11;
-    lines.forEach((line) => {
-      ctx.fillText(line, baseX, currentY);
-      currentY += lineHeight;
-    });
-  }
 
   function baixarImagem(blob, start, end) {
     if (!blob) return;
-    const url = URL.createObjectURL(blob);
     const nomeArquivo = `banco-horas_${App.fmtCurta(start).replace("/", "-")}_a_${App.fmtCurta(end).replace("/", "-")}-${end.getFullYear()}.png`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nomeArquivo;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    App.mostrarToast("Imagem salva!");
+    App.baixarImagemRelatorio(blob, nomeArquivo);
   }
 
   async function gerarImagem() {
@@ -374,15 +188,19 @@
       return acc;
     }, { total: 0, positivos: 0, negativos: 0, saldo: 0 });
 
-    const dados = dadosPeriodo.map(({ key, date, reg }) => ({
-      dia: `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
-      ponto: "15:00",
-      saida: reg.saida,
-      localizacao: getLocalizacaoTexto(reg.localizacao),
-      comprovante: getComprovanteResumo(key, reg),
-      saldo: reg.extraMin > 0 ? `+${App.formatarExtra(reg.extraMin)}` : App.formatarExtra(reg.extraMin),
-      estado: reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "neutro",
-    }));
+    const dados = dadosPeriodo.map(({ key, date, reg }) => {
+      const comprovanteResumo = App.getComprovanteInfo(key, reg?.comprovanteNome).resumo;
+      return {
+        dia: `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
+        ponto: "15:00",
+        saida: reg.saida,
+        localizacao: App.getLocalizacaoTexto(reg.localizacao),
+        comprovante: comprovanteResumo,
+        comprovanteLinhas: splitComprovanteResumo(comprovanteResumo),
+        saldo: reg.extraMin > 0 ? `+${App.formatarExtra(reg.extraMin)}` : App.formatarExtra(reg.extraMin),
+        estado: reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "neutro",
+      };
+    });
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -404,7 +222,7 @@
       { key: "saldo", label: "Saldo", width: 0.12, align: "right" },
     ];
 
-    const logoH = await drawLogo(ctx, totalW, padding);
+    const logoH = await App.drawLogoImage(ctx, totalW, padding, "../assets/timewallet_logo_header_black.svg", 620);
     const titleTop = padding + logoH + 14;
     const tableTop = titleTop + heroH + metricH + 120;
     const totalH = tableTop + headerH + dados.length * rowH + footerH + padding;
@@ -416,7 +234,7 @@
     ctx.fillStyle = "#F7F5EE";
     ctx.fillRect(0, 0, totalW, totalH);
 
-    if (logoH) await drawLogo(ctx, totalW, padding);
+    if (logoH) await App.drawLogoImage(ctx, totalW, padding, "../assets/timewallet_logo_header_black.svg", 620);
 
     ctx.fillStyle = "#20291A";
     ctx.font = '700 28px Georgia, "Times New Roman", serif';
@@ -428,7 +246,7 @@
     ctx.fillText(`Período ${App.getPeriodLabel(periodAnchor)}`, totalW / 2, titleTop + 30);
 
     const heroY = titleTop + 48;
-    drawRoundedRect(ctx, padding, heroY, totalW - padding * 2, heroH, 28, "#7B846D", null);
+    App.drawRoundedRect(ctx, padding, heroY, totalW - padding * 2, heroH, 28, "#AEB49E", null);
 
     ctx.fillStyle = "rgba(255,255,255,.82)";
     ctx.font = "700 13px -apple-system, BlinkMacSystemFont, sans-serif";
@@ -439,22 +257,22 @@
     ctx.font = "700 38px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.fillText(App.formatarExtra(resumo.saldo), padding + 28, heroY + 76);
 
-    ctx.font = "600 13px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.font = "700 24px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText(`${resumo.total} registro${resumo.total === 1 ? "" : "s"}`, totalW - padding - 28, heroY + 50);
+    ctx.fillText(App.obterNomeUsuario() || "—", totalW - padding - 28, heroY + 55);
 
     const metricY = heroY + heroH + 18;
     const metricW = (totalW - padding * 2 - metricGap * 2) / 3;
-    drawMetricCard(ctx, padding, metricY, metricW, metricH, "Registros", resumo.total, "#20291A");
-    drawMetricCard(ctx, padding + metricW + metricGap, metricY, metricW, metricH, "Extras", resumo.positivos, "#4A701C");
-    drawMetricCard(ctx, padding + (metricW + metricGap) * 2, metricY, metricW, metricH, "Descontos", resumo.negativos, "#B3261E");
+    App.drawMetricCard(ctx, padding, metricY, metricW, metricH, "Registros", resumo.total, "#20291A");
+    App.drawMetricCard(ctx, padding + metricW + metricGap, metricY, metricW, metricH, "Extras", resumo.positivos, "#4A701C");
+    App.drawMetricCard(ctx, padding + (metricW + metricGap) * 2, metricY, metricW, metricH, "Descontos", resumo.negativos, "#B3261E");
 
-    drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, headerH + dados.length * rowH, 28, "#FFFFFF", "#AEB7A0");
+    App.drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, headerH + dados.length * rowH, 28, "#FFFFFF", "#AEB7A0");
 
     let x = padding;
     cols.forEach((col, index) => {
       const colW = (totalW - padding * 2) * col.width;
-      drawCellText(ctx, col.label, x, tableTop, colW, headerH, col.align, "#000000", "700 20px -apple-system, BlinkMacSystemFont, sans-serif", 1);
+      App.drawCellText(ctx, col.label, x, tableTop, colW, headerH, col.align, "#000000", "700 20px -apple-system, BlinkMacSystemFont, sans-serif", 1);
       if (index < cols.length - 1) {
         ctx.strokeStyle = "#B2BAA7";
         ctx.lineWidth = 1.5;
@@ -501,7 +319,11 @@
               ? "#375215"
               : "#20291A";
         const font = "700 18px -apple-system, BlinkMacSystemFont, sans-serif";
-        drawCellText(ctx, row[col.key], colX, y, colW, rowH, col.align, color, font, col.key === "localizacao" ? 4 : col.key === "comprovante" || col.key === "dia" ? 3 : 2);
+        if (col.key === "comprovante" && row.comprovanteLinhas) {
+          App.drawCellLines(ctx, row.comprovanteLinhas, colX, y, colW, rowH, col.align, color, font);
+        } else {
+          App.drawCellText(ctx, row[col.key], colX, y, colW, rowH, col.align, color, font, col.key === "localizacao" ? 4 : col.key === "comprovante" || col.key === "dia" ? 3 : 2);
+        }
         colX += colW;
       });
       y += rowH;
@@ -701,7 +523,7 @@
     const nome = comprovanteInfo.nome;
     const statusLabel = reg.extraMin < 0 ? "Desconto" : reg.extraMin === 0 ? "Neutro" : "Tempo extra";
     const heroClass = "detail-hero";
-    const heroBg = "background:#7B846D;color:#fff;";
+    const heroBg = "background:#AEB49E;color:#fff;";
     const localizacaoHtml = reg.localizacao ? App.getLocationMapLink(reg.localizacao) : "Não registrada";
 
     area.innerHTML = `

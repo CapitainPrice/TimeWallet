@@ -4,10 +4,13 @@
   const PONTO_MINUTOS = 15 * 60;
   const TOLERANCIA_MINUTOS = 15 * 60 + 10;
   const STORAGE_KEY = "bancoHoras_registros";
+  const BAIXAS_STORAGE_KEY = "bancoHoras_baixas";
   const NOME_KEY = "bancoHoras_nome";
   const PERIOD_CONFIG_KEY = "bancoHoras_periodo";
   const SPLASH_SESSION_KEY = "timewallet_splash_seen";
   const DEFAULT_PERIOD_CONFIG = Object.freeze({ startDay: 26, endDay: 25 });
+  const COMPROVANTE_PERIODO_MESES = 6;
+  const COMPROVANTE_CICLO_KEY_PREFIX = "bancoHoras_comprovantes_primeiro_login";
 
   const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
   const DIAS_SEMANA_ABR = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -17,12 +20,16 @@
   const hoje = new Date();
   const hojeKey = toKey(hoje);
   const GEOCODING_CACHE = new Map();
+  const LOGO_CACHE = new Map();
   const feriadosCache = {};
 
   let firebaseApp = null;
   let firebaseAuth = null;
   let firebaseDb = null;
   let primaryNavOverride = null;
+  let camStream = null;
+  let camFotoCapturada = null;
+  let camResolver = null;
 
   function byId(id) {
     return document.getElementById(id);
@@ -32,6 +39,16 @@
     const el = byId(id);
     if (el) el.addEventListener(eventName, handler);
     return el;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[char]);
   }
 
   function toKey(d) {
@@ -241,23 +258,32 @@
     return `periodo ${String(start.getMonth() + 1).padStart(2, "0")}`;
   }
 
-  function getComprovanteNomePadrao(anchor = getCurrentPaymentAnchor(), ext = "jpg") {
-    const extensao = String(ext || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
-    return `comprovante ${getPeriodoNome(anchor)}.${extensao}`;
+  function resolveComprovanteData(dateOrKey) {
+    if (dateOrKey instanceof Date) return dateOrKey;
+    if (!dateOrKey) return new Date();
+    const [year, month, day] = dateOrKey.split("-").map(Number);
+    return new Date(year, (month || 1) - 1, day || 1);
   }
 
-  function normalizarNomeComprovante(nomeOriginal, anchor = getCurrentPaymentAnchor()) {
+  function formatarDataArquivo(date) {
+    return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+  }
+
+  function sanitizarNomeArquivo(texto) {
+    return String(texto || "").trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_");
+  }
+
+  function getComprovanteNomePadrao(dateOrKey, ext = "jpg") {
+    const extensao = String(ext || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
+    const dataArquivo = formatarDataArquivo(resolveComprovanteData(dateOrKey));
+    const usuario = sanitizarNomeArquivo(obterNomeUsuario()) || "usuario";
+    return `comprovante_${dataArquivo}_${usuario}.${extensao}`;
+  }
+
+  function normalizarNomeComprovante(dateOrKey, nomeOriginal) {
     const match = String(nomeOriginal || "").match(/\.([a-zA-Z0-9]+)$/);
     const ext = match?.[1] || "jpg";
-    return getComprovanteNomePadrao(anchor, ext);
-  }
-
-  function getComprovanteTitulo(nome, anchor = getCurrentPaymentAnchor()) {
-    return nome || getComprovanteNomePadrao(anchor);
-  }
-
-  function getComprovanteResumo(nome, anchor = getCurrentPaymentAnchor()) {
-    return getComprovanteTitulo(nome, anchor).replace(/\.[^.]+$/, "");
+    return getComprovanteNomePadrao(dateOrKey, ext);
   }
 
   function getComprovantePeriodoAtual(dateKey) {
@@ -266,523 +292,235 @@
     return getCurrentPaymentAnchor(new Date(year, (month || 1) - 1, day || 1));
   }
 
-  function getComprovanteNomePorData(dateKey, nomeOriginal) {
-    return normalizarNomeComprovante(nomeOriginal, getComprovantePeriodoAtual(dateKey));
-  }
-
-  function getComprovanteResumoPorData(dateKey, nome) {
-    return getComprovanteResumo(nome, getComprovantePeriodoAtual(dateKey));
-  }
-
-  function getComprovanteTituloPorData(dateKey, nome) {
-    return getComprovanteTitulo(nome, getComprovantePeriodoAtual(dateKey));
-  }
-
-  function getPeriodoLabelPorData(dateKey) {
-    return getPeriodoNome(getComprovantePeriodoAtual(dateKey));
-  }
-
-  function getPeriodoNomeData(date) {
-    return getPeriodoNome(getCurrentPaymentAnchor(date));
-  }
-
-  function getComprovanteNomePorDataObj(date, nomeOriginal) {
-    return normalizarNomeComprovante(nomeOriginal, getCurrentPaymentAnchor(date));
-  }
-
-  function getComprovanteResumoPorDataObj(date, nome) {
-    return getComprovanteResumo(nome, getCurrentPaymentAnchor(date));
-  }
-
-  function getComprovanteTituloPorDataObj(date, nome) {
-    return getComprovanteTitulo(nome, getCurrentPaymentAnchor(date));
-  }
-
-  function getPeriodoLabelPorDataObj(date) {
-    return getPeriodoNome(getCurrentPaymentAnchor(date));
-  }
-
-  function getPeriodoAnchorForDate(date) {
-    return getCurrentPaymentAnchor(date);
-  }
-
-  function getComprovanteNome(dateOrKey, nomeOriginal) {
-    if (dateOrKey instanceof Date) return getComprovanteNomePorDataObj(dateOrKey, nomeOriginal);
-    return getComprovanteNomePorData(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoLabel(dateOrKey, nome) {
-    if (dateOrKey instanceof Date) return getComprovanteResumoPorDataObj(dateOrKey, nome);
-    return getComprovanteResumoPorData(dateOrKey, nome);
-  }
-
-  function getComprovanteTituloLabel(dateOrKey, nome) {
-    if (dateOrKey instanceof Date) return getComprovanteTituloPorDataObj(dateOrKey, nome);
-    return getComprovanteTituloPorData(dateOrKey, nome);
-  }
-
-  function getPeriodoNomeLabel(dateOrKey) {
-    if (dateOrKey instanceof Date) return getPeriodoLabelPorDataObj(dateOrKey);
-    return getPeriodoLabelPorData(dateOrKey);
-  }
-
-  function getPeriodoAnchorValue(dateOrKey) {
-    if (dateOrKey instanceof Date) return getPeriodoAnchorForDate(dateOrKey);
-    return getComprovantePeriodoAtual(dateOrKey);
-  }
-
-  function getComprovanteNomePadraoPorData(dateOrKey, ext = "jpg") {
-    return getComprovanteNome(dateOrKey, `arquivo.${ext}`);
-  }
-
-  function getComprovanteResumoPadraoPorData(dateOrKey) {
-    return getComprovanteResumoLabel(dateOrKey);
-  }
-
-  function getComprovanteTituloPadraoPorData(dateOrKey) {
-    return getComprovanteTituloLabel(dateOrKey);
-  }
-
-  function getPeriodoNomePadraoPorData(dateOrKey) {
-    return getPeriodoNomeLabel(dateOrKey);
-  }
-
-  function getPeriodoAnchorPadraoPorData(dateOrKey) {
-    return getPeriodoAnchorValue(dateOrKey);
-  }
-
-  function getComprovanteFileName(dateOrKey, nomeOriginal) {
-    return getComprovanteNome(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteDisplayName(dateOrKey, nome) {
-    return getComprovanteTituloLabel(dateOrKey, nome);
-  }
-
-  function getComprovanteDisplayShortName(dateOrKey, nome) {
-    return getComprovanteResumoLabel(dateOrKey, nome);
-  }
-
-  function getPeriodoDisplayName(dateOrKey) {
-    return getPeriodoNomeLabel(dateOrKey);
-  }
-
-  function getPeriodoAnchorFor(dateOrKey) {
-    return getPeriodoAnchorValue(dateOrKey);
-  }
-
-  function getPeriodoComprovanteNome(dateOrKey, nomeOriginal) {
-    return getComprovanteFileName(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoComprovanteTitulo(dateOrKey, nome) {
-    return getComprovanteDisplayName(dateOrKey, nome);
-  }
-
-  function getPeriodoComprovanteResumo(dateOrKey, nome) {
-    return getComprovanteDisplayShortName(dateOrKey, nome);
-  }
-
-  function getPeriodoComprovanteLabel(dateOrKey) {
-    return getPeriodoDisplayName(dateOrKey);
-  }
-
-  function getPeriodoComprovanteAnchor(dateOrKey) {
-    return getPeriodoAnchorFor(dateOrKey);
-  }
-
-  function getComprovantePadrao(dateOrKey, nomeOriginal) {
-    return getPeriodoComprovanteNome(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovantePadraoTitulo(dateOrKey, nome) {
-    return getPeriodoComprovanteTitulo(dateOrKey, nome);
-  }
-
-  function getComprovantePadraoResumo(dateOrKey, nome) {
-    return getPeriodoComprovanteResumo(dateOrKey, nome);
-  }
-
-  function getPeriodoPadrao(dateOrKey) {
-    return getPeriodoComprovanteLabel(dateOrKey);
-  }
-
-  function getPeriodoPadraoAnchor(dateOrKey) {
-    return getPeriodoComprovanteAnchor(dateOrKey);
-  }
-
-  function getComprovanteNomeFinal(dateOrKey, nomeOriginal) {
-    return getComprovantePadrao(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloFinal(dateOrKey, nome) {
-    return getComprovantePadraoTitulo(dateOrKey, nome);
-  }
-
-  function getComprovanteResumoFinal(dateOrKey, nome) {
-    return getComprovantePadraoResumo(dateOrKey, nome);
-  }
-
-  function getPeriodoFinal(dateOrKey) {
-    return getPeriodoPadrao(dateOrKey);
-  }
-
-  function getPeriodoFinalAnchor(dateOrKey) {
-    return getPeriodoPadraoAnchor(dateOrKey);
-  }
-
-  function buildComprovanteNome(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeFinal(dateOrKey, nomeOriginal);
-  }
-
-  function buildComprovanteTitulo(dateOrKey, nome) {
-    return getComprovanteTituloFinal(dateOrKey, nome);
-  }
-
-  function buildComprovanteResumo(dateOrKey, nome) {
-    return getComprovanteResumoFinal(dateOrKey, nome);
-  }
-
-  function buildPeriodoNome(dateOrKey) {
-    return getPeriodoFinal(dateOrKey);
-  }
-
-  function buildPeriodoAnchor(dateOrKey) {
-    return getPeriodoFinalAnchor(dateOrKey);
-  }
-
-  function padronizarNomeComprovante(dateOrKey, nomeOriginal) {
-    return buildComprovanteNome(dateOrKey, nomeOriginal);
-  }
-
-  function resumirNomeComprovante(dateOrKey, nome) {
-    return buildComprovanteResumo(dateOrKey, nome);
-  }
-
-  function titularNomeComprovante(dateOrKey, nome) {
-    return buildComprovanteTitulo(dateOrKey, nome);
-  }
-
-  function nomePeriodoComprovante(dateOrKey) {
-    return buildPeriodoNome(dateOrKey);
-  }
-
-  function anchorPeriodoComprovante(dateOrKey) {
-    return buildPeriodoAnchor(dateOrKey);
-  }
-
-  function getComprovanteMetadata(dateOrKey, nomeOriginal) {
-    return {
-      nome: padronizarNomeComprovante(dateOrKey, nomeOriginal),
-      titulo: titularNomeComprovante(dateOrKey, nomeOriginal),
-      resumo: resumirNomeComprovante(dateOrKey, nomeOriginal),
-      periodo: nomePeriodoComprovante(dateOrKey),
-      anchor: anchorPeriodoComprovante(dateOrKey),
-    };
-  }
-
-  function getComprovanteNomeInfo(dateOrKey, nomeOriginal) {
-    return getComprovanteMetadata(dateOrKey, nomeOriginal).nome;
-  }
-
-  function getComprovanteTituloInfo(dateOrKey, nomeOriginal) {
-    return getComprovanteMetadata(dateOrKey, nomeOriginal).titulo;
-  }
-
-  function getComprovanteResumoInfo(dateOrKey, nomeOriginal) {
-    return getComprovanteMetadata(dateOrKey, nomeOriginal).resumo;
-  }
-
-  function getPeriodoInfo(dateOrKey) {
-    return getComprovanteMetadata(dateOrKey).periodo;
-  }
-
-  function getPeriodoAnchorInfo(dateOrKey) {
-    return getComprovanteMetadata(dateOrKey).anchor;
-  }
-
-  function getComprovanteData(dateOrKey, nomeOriginal) {
-    return getComprovanteMetadata(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteNomePadronizado(dateOrKey, nomeOriginal) {
-    return getComprovanteData(dateOrKey, nomeOriginal).nome;
-  }
-
-  function getComprovanteResumoPadronizado(dateOrKey, nomeOriginal) {
-    return getComprovanteData(dateOrKey, nomeOriginal).resumo;
-  }
-
-  function getComprovanteTituloPadronizado(dateOrKey, nomeOriginal) {
-    return getComprovanteData(dateOrKey, nomeOriginal).titulo;
-  }
-
-  function getPeriodoPadronizado(dateOrKey) {
-    return getComprovanteData(dateOrKey).periodo;
-  }
-
-  function getPeriodoAnchorPadronizado(dateOrKey) {
-    return getComprovanteData(dateOrKey).anchor;
-  }
-
-  function getComprovanteMeta(dateOrKey, nomeOriginal) {
-    return getComprovanteData(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovantePadraoNome(dateOrKey, nomeOriginal) {
-    return getPeriodoComprovanteNome(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovantePadraoResumo(dateOrKey, nomeOriginal) {
-    return getPeriodoComprovanteResumo(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovantePadraoTitulo(dateOrKey, nomeOriginal) {
-    return getPeriodoComprovanteTitulo(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoPadraoNome(dateOrKey) {
-    return getPeriodoComprovanteLabel(dateOrKey);
-  }
-
-  function getPeriodoPadraoData(dateOrKey) {
-    return getPeriodoComprovanteAnchor(dateOrKey);
-  }
-
-  function getComprovanteNomeUtil(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoNome(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoUtil(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoResumo(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloUtil(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoTitulo(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoUtil(dateOrKey) {
-    return getPeriodoPadraoNome(dateOrKey);
-  }
-
-  function getPeriodoDataUtil(dateOrKey) {
-    return getPeriodoPadraoData(dateOrKey);
-  }
-
-  function getComprovanteNomeFinalizado(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeUtil(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoFinalizado(dateOrKey, nomeOriginal) {
-    return getComprovanteResumoUtil(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloFinalizado(dateOrKey, nomeOriginal) {
-    return getComprovanteTituloUtil(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoFinalizado(dateOrKey) {
-    return getPeriodoUtil(dateOrKey);
-  }
-
-  function getPeriodoDataFinalizado(dateOrKey) {
-    return getPeriodoDataUtil(dateOrKey);
-  }
-
-  function getComprovanteNomeView(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeFinalizado(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoView(dateOrKey, nomeOriginal) {
-    return getComprovanteResumoFinalizado(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloView(dateOrKey, nomeOriginal) {
-    return getComprovanteTituloFinalizado(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoView(dateOrKey) {
-    return getPeriodoFinalizado(dateOrKey);
-  }
-
-  function getPeriodoDataView(dateOrKey) {
-    return getPeriodoDataFinalizado(dateOrKey);
-  }
-
-  function getComprovanteNomeUI(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeView(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoUI(dateOrKey, nomeOriginal) {
-    return getComprovanteResumoView(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloUI(dateOrKey, nomeOriginal) {
-    return getComprovanteTituloView(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoUI(dateOrKey) {
-    return getPeriodoView(dateOrKey);
-  }
-
-  function getPeriodoDataUI(dateOrKey) {
-    return getPeriodoDataView(dateOrKey);
-  }
-
-  function getComprovanteNomeFinalUI(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeUI(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoFinalUI(dateOrKey, nomeOriginal) {
-    return getComprovanteResumoUI(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloFinalUI(dateOrKey, nomeOriginal) {
-    return getComprovanteTituloUI(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoFinalUI(dateOrKey) {
-    return getPeriodoUI(dateOrKey);
-  }
-
-  function getPeriodoDataFinalUI(dateOrKey) {
-    return getPeriodoDataUI(dateOrKey);
-  }
-
-  function getComprovantePadraoUI(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeFinalUI(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovantePadraoResumoUI(dateOrKey, nomeOriginal) {
-    return getComprovanteResumoFinalUI(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovantePadraoTituloUI(dateOrKey, nomeOriginal) {
-    return getComprovanteTituloFinalUI(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoPadraoUI(dateOrKey) {
-    return getPeriodoFinalUI(dateOrKey);
-  }
-
-  function getPeriodoDataPadraoUI(dateOrKey) {
-    return getPeriodoDataFinalUI(dateOrKey);
-  }
-
-  function getComprovanteNomeAtual(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoUI(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoAtual(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoResumoUI(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloAtual(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoTituloUI(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoAtualNome(dateOrKey) {
-    return getPeriodoPadraoUI(dateOrKey);
-  }
-
-  function getPeriodoAtualData(dateOrKey) {
-    return getPeriodoDataPadraoUI(dateOrKey);
-  }
-
-  function buildComprovantePadrao(dateOrKey, nomeOriginal) {
-    return {
-      nome: getComprovanteNomeAtual(dateOrKey, nomeOriginal),
-      resumo: getComprovanteResumoAtual(dateOrKey, nomeOriginal),
-      titulo: getComprovanteTituloAtual(dateOrKey, nomeOriginal),
-      periodo: getPeriodoAtualNome(dateOrKey),
-      anchor: getPeriodoAtualData(dateOrKey),
-    };
-  }
-
-  function getComprovantePadraoInfo(dateOrKey, nomeOriginal) {
-    return buildComprovantePadrao(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteNomeSafe(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoInfo(dateOrKey, nomeOriginal).nome;
-  }
-
-  function getComprovanteResumoSafe(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoInfo(dateOrKey, nomeOriginal).resumo;
-  }
-
-  function getComprovanteTituloSafe(dateOrKey, nomeOriginal) {
-    return getComprovantePadraoInfo(dateOrKey, nomeOriginal).titulo;
-  }
-
-  function getPeriodoSafe(dateOrKey) {
-    return getComprovantePadraoInfo(dateOrKey).periodo;
-  }
-
-  function getPeriodoAnchorSafe(dateOrKey) {
-    return getComprovantePadraoInfo(dateOrKey).anchor;
-  }
-
-  function getComprovanteNomeDisplay(dateOrKey, nomeOriginal) {
-    return getComprovanteNomeSafe(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteResumoDisplay(dateOrKey, nomeOriginal) {
-    return getComprovanteResumoSafe(dateOrKey, nomeOriginal);
-  }
-
-  function getComprovanteTituloDisplay(dateOrKey, nomeOriginal) {
-    return getComprovanteTituloSafe(dateOrKey, nomeOriginal);
-  }
-
-  function getPeriodoDisplay(dateOrKey) {
-    return getPeriodoSafe(dateOrKey);
-  }
-
-  function getPeriodoAnchorDisplay(dateOrKey) {
-    return getPeriodoAnchorSafe(dateOrKey);
+  function resolveComprovanteAnchor(dateOrKey) {
+    return dateOrKey instanceof Date ? getCurrentPaymentAnchor(dateOrKey) : getComprovantePeriodoAtual(dateOrKey);
   }
 
   function getComprovanteInfo(dateOrKey, nomeOriginal) {
+    const anchor = resolveComprovanteAnchor(dateOrKey);
+    const titulo = nomeOriginal || getComprovanteNomePadrao(dateOrKey);
     return {
-      nome: getComprovanteNomeDisplay(dateOrKey, nomeOriginal),
-      resumo: getComprovanteResumoDisplay(dateOrKey, nomeOriginal),
-      titulo: getComprovanteTituloDisplay(dateOrKey, nomeOriginal),
-      periodo: getPeriodoDisplay(dateOrKey),
-      anchor: getPeriodoAnchorDisplay(dateOrKey),
+      nome: normalizarNomeComprovante(dateOrKey, nomeOriginal),
+      titulo,
+      resumo: titulo.replace(/\.[^.]+$/, ""),
+      periodo: getPeriodoNome(anchor),
+      anchor,
     };
   }
 
-  function resolveComprovanteInfo(dateOrKey, nomeOriginal) {
-    return getComprovanteInfo(dateOrKey, nomeOriginal);
-  }
-
   function formatComprovanteNome(dateOrKey, nomeOriginal) {
-    return resolveComprovanteInfo(dateOrKey, nomeOriginal).nome;
+    return getComprovanteInfo(dateOrKey, nomeOriginal).nome;
   }
 
   function formatComprovanteResumo(dateOrKey, nomeOriginal) {
-    return resolveComprovanteInfo(dateOrKey, nomeOriginal).resumo;
+    return getComprovanteInfo(dateOrKey, nomeOriginal).resumo;
   }
 
   function formatComprovanteTitulo(dateOrKey, nomeOriginal) {
-    return resolveComprovanteInfo(dateOrKey, nomeOriginal).titulo;
+    return getComprovanteInfo(dateOrKey, nomeOriginal).titulo;
   }
 
   function formatPeriodoComprovante(dateOrKey) {
-    return resolveComprovanteInfo(dateOrKey).periodo;
+    return getComprovanteInfo(dateOrKey).periodo;
   }
 
-  function resolvePeriodoComprovante(dateOrKey) {
-    return resolveComprovanteInfo(dateOrKey).anchor;
+  function startOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
   }
 
-  function buildComprovanteInfo(dateOrKey, nomeOriginal) {
-    return resolveComprovanteInfo(dateOrKey, nomeOriginal);
+  function addMonths(date, months) {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
   }
 
-  function getComprovanteInfoResolved(dateOrKey, nomeOriginal) {
-    return buildComprovanteInfo(dateOrKey, nomeOriginal);
+  function getComprovanteCicloKey() {
+    const uid = Store.getCurrentUser()?.uid || "guest";
+    return `${COMPROVANTE_CICLO_KEY_PREFIX}_${uid}`;
+  }
+
+  function getComprovanteCicloBase() {
+    const key = getComprovanteCicloKey();
+    const salvo = localStorage.getItem(key);
+    if (salvo) {
+      const dataSalva = new Date(`${salvo}T00:00:00`);
+      if (!Number.isNaN(dataSalva.getTime())) return dataSalva;
+    }
+    const agora = new Date();
+    localStorage.setItem(key, toKey(agora));
+    return agora;
+  }
+
+  function setComprovanteCicloBase(date) {
+    localStorage.setItem(getComprovanteCicloKey(), toKey(date));
+  }
+
+  function getComprovanteCicloAtual() {
+    let inicio = startOfMonth(getComprovanteCicloBase());
+    let fim = getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
+    const agora = new Date();
+
+    while (agora > fim) {
+      inicio = addMonths(inicio, COMPROVANTE_PERIODO_MESES);
+      fim = getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
+      setComprovanteCicloBase(inicio);
+    }
+
+    return { start: inicio, end: fim };
+  }
+
+  function getLocalizacaoTexto(localizacao) {
+    if (!localizacao) return "Não registrada";
+    if (localizacao.address) return localizacao.address;
+    if (localizacao.endereco) return localizacao.endereco;
+    return `${localizacao.lat.toFixed(5)}, ${localizacao.lng.toFixed(5)}`;
+  }
+
+  function fitTextWithEllipsis(ctx, text, maxWidth) {
+    let value = String(text || "");
+    if (ctx.measureText(value).width <= maxWidth) return value;
+    while (value.length > 1 && ctx.measureText(`${value}…`).width > maxWidth) {
+      value = value.slice(0, -1);
+    }
+    return `${value}…`;
+  }
+
+  function breakLongToken(ctx, token, maxWidth) {
+    const parts = [];
+    let current = "";
+    for (const char of String(token || "")) {
+      const test = current + char;
+      if (current && ctx.measureText(test).width > maxWidth) {
+        parts.push(current);
+        current = char;
+      } else {
+        current = test;
+      }
+    }
+    if (current) parts.push(current);
+    return parts.length ? parts : [String(token || "—")];
+  }
+
+  function wrapText(ctx, text, maxWidth, maxLines = 2) {
+    const tokens = String(text || "—").trim().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return ["—"];
+
+    const lines = [];
+    let current = "";
+
+    tokens.forEach((token) => {
+      const parts = ctx.measureText(token).width > maxWidth ? breakLongToken(ctx, token, maxWidth) : [token];
+      parts.forEach((part, index) => {
+        const separator = current ? (index === 0 ? " " : "") : "";
+        const test = `${current}${separator}${part}`;
+        if (!current || ctx.measureText(test).width <= maxWidth) {
+          current = test;
+          return;
+        }
+        lines.push(current);
+        current = part;
+      });
+    });
+
+    if (current) lines.push(current);
+    if (lines.length <= maxLines) return lines;
+
+    const limited = lines.slice(0, maxLines);
+    limited[maxLines - 1] = fitTextWithEllipsis(ctx, limited[maxLines - 1], maxWidth);
+    if (!limited[maxLines - 1].endsWith("…")) {
+      limited[maxLines - 1] = fitTextWithEllipsis(ctx, `${limited[maxLines - 1]}…`, maxWidth);
+    }
+    return limited;
+  }
+
+  function drawRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + width, y, x + width, y + height, r);
+    ctx.arcTo(x + width, y + height, x, y + height, r);
+    ctx.arcTo(x, y + height, x, y, r);
+    ctx.arcTo(x, y, x + width, y, r);
+    ctx.closePath();
+    if (fillStyle) {
+      ctx.fillStyle = fillStyle;
+      ctx.fill();
+    }
+    if (strokeStyle) {
+      ctx.strokeStyle = strokeStyle;
+      ctx.stroke();
+    }
+  }
+
+  function drawMetricCard(ctx, x, y, width, height, label, value, accent) {
+    drawRoundedRect(ctx, x, y, width, height, 22, "#FFFFFF", "#E6EBDB");
+    ctx.fillStyle = "#7A8570";
+    ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(label, x + 18, y + 24);
+    ctx.fillStyle = accent;
+    ctx.font = "700 28px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(String(value), x + 18, y + 58);
+  }
+
+  function drawCellLines(ctx, lines, x, y, width, height, align, color, font) {
+    ctx.fillStyle = color;
+    ctx.font = font;
+    ctx.textAlign = align;
+    const pad = 10;
+    const fontSizeMatch = font.match(/(\d+)px/);
+    const fontSize = fontSizeMatch ? Number(fontSizeMatch[1]) : 14;
+    const lineHeight = Math.round(fontSize * 1.4);
+    const totalHeight = lines.length * lineHeight;
+    const baseX = align === "left" ? x + pad : align === "right" ? x + width - pad : x + width / 2;
+    let currentY = y + (height - totalHeight) / 2 + lineHeight * 0.75;
+    lines.forEach((line) => {
+      ctx.fillText(line, baseX, currentY);
+      currentY += lineHeight;
+    });
+  }
+
+  function drawCellText(ctx, value, x, y, width, height, align, color, font, maxLines = 2) {
+    ctx.font = font;
+    const pad = 10;
+    const maxW = Math.max(24, width - pad * 2);
+    const lines = wrapText(ctx, value, maxW, maxLines);
+    drawCellLines(ctx, lines, x, y, width, height, align, color, font);
+  }
+
+  async function drawLogoImage(ctx, totalW, padding, svgPath, maxWidth) {
+    try {
+      let logoSrc = LOGO_CACHE.get(svgPath);
+      if (!logoSrc) {
+        const response = await fetch(svgPath);
+        const svg = await response.text();
+        logoSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        LOGO_CACHE.set(svgPath, logoSrc);
+      }
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = logoSrc;
+      });
+      const ratio = img.width / img.height;
+      const height = maxWidth / ratio;
+      ctx.drawImage(img, (totalW - maxWidth) / 2, padding, maxWidth, height);
+      return height;
+    } catch {
+      return 0;
+    }
+  }
+
+  function baixarImagemRelatorio(blob, nomeArquivo) {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast("Imagem salva!");
   }
 
   function obterNomeUsuario() {
@@ -807,7 +545,7 @@
 
   function getLocationMapLink(loc) {
     if (!loc) return '<span style="color:var(--muted);font-size:11px;">Não registrada</span>';
-    const label = getLocationDisplay(loc);
+    const label = escapeHtml(getLocationDisplay(loc));
     if (typeof loc === "object" && typeof loc.lat === "number" && typeof loc.lng === "number") {
       return `<a href="https://www.google.com/maps?q=${loc.lat},${loc.lng}" target="_blank" rel="noopener" style="color:var(--primary-dark);font-size:11px;">${label}</a>`;
     }
@@ -834,6 +572,92 @@
     on("closeImgModal", "click", fecharImagem);
     on("imgModal", "click", (e) => {
       if (e.target.id === "imgModal") fecharImagem();
+    });
+  }
+
+  function camMostrarLive() {
+    byId("camVideo")?.style.setProperty("display", "block");
+    byId("camPreview")?.style.setProperty("display", "none");
+    byId("camQuestion")?.style.setProperty("display", "none");
+    byId("camActionsLive")?.style.setProperty("display", "flex");
+    byId("camActionsPreview")?.style.setProperty("display", "none");
+  }
+
+  function camFechar(resultado) {
+    byId("camModal")?.classList.remove("show");
+    if (camStream) {
+      camStream.getTracks().forEach((track) => track.stop());
+      camStream = null;
+    }
+    camFotoCapturada = null;
+    camMostrarLive();
+    if (camResolver) {
+      const resolve = camResolver;
+      camResolver = null;
+      resolve(resultado);
+    }
+  }
+
+  function camCapturarFoto() {
+    const video = byId("camVideo");
+    const canvas = byId("camCanvas");
+    const preview = byId("camPreview");
+    if (!video || !canvas || !preview) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0);
+    camFotoCapturada = canvas.toDataURL("image/jpeg", 0.85);
+
+    ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
+    ctx.clearRect(-canvas.width, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0);
+    const fotoPreview = canvas.toDataURL("image/jpeg", 0.85);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    preview.src = fotoPreview;
+    byId("camVideo")?.style.setProperty("display", "none");
+    preview.style.display = "block";
+    byId("camQuestion")?.style.setProperty("display", "block");
+    byId("camActionsLive")?.style.setProperty("display", "none");
+    byId("camActionsPreview")?.style.setProperty("display", "flex");
+  }
+
+  function initCameraModal() {
+    on("camCancelar", "click", () => camFechar(null));
+    on("camCapturar", "click", camCapturarFoto);
+    on("camMudar", "click", camMostrarLive);
+    on("camFeito", "click", () => camFechar(camFotoCapturada));
+    on("camModal", "click", (e) => {
+      if (e.target.id === "camModal") camFechar(null);
+    });
+  }
+
+  async function abrirCameraModal() {
+    const modal = byId("camModal");
+    const video = byId("camVideo");
+    if (!modal || !video) return null;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return "unsupported";
+
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if (!devices.some((device) => device.kind === "videoinput")) return "unsupported";
+    } catch {}
+
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+    } catch {
+      return "unsupported";
+    }
+
+    video.srcObject = camStream;
+    camMostrarLive();
+    modal.classList.add("show");
+    return new Promise((resolve) => {
+      camResolver = resolve;
     });
   }
 
@@ -892,14 +716,16 @@
     if (!btnUsuario || !dropdownHeader || !dropdownSignIn || !dropdownSignOut || !userDropdown) return;
 
     if (user) {
-      const photo = user.photoURL || defaultUserPhoto();
-      btnUsuario.innerHTML = `<img src="${photo}" alt="${user.displayName || "Usuário"}">`;
+      const photo = escapeHtml(user.photoURL || defaultUserPhoto());
+      const nome = escapeHtml(user.displayName || "Usuário");
+      const email = escapeHtml(user.email || "");
+      btnUsuario.innerHTML = `<img src="${photo}" alt="${nome}">`;
       btnUsuario.title = user.displayName || user.email || "Usuário logado";
       dropdownHeader.innerHTML = `
         <img src="${photo}" alt="">
         <div class="user-info">
-          <div class="user-name">${user.displayName || "Usuário"}</div>
-          <div class="user-email">${user.email || ""}</div>
+          <div class="user-name">${nome}</div>
+          <div class="user-email">${email}</div>
           <div class="user-status">Conta Google conectada</div>
         </div>
       `;
@@ -926,7 +752,7 @@
       </div>
       <div class="user-info">
         <div class="user-name">Não conectado</div>
-        <div class="user-email">Entre para sincronizar seus registros</div>
+        <div class="user-email user-email-wrap">Entre para sincronizar seus registros</div>
       </div>
     `;
     dropdownSignIn.hidden = false;
@@ -1019,6 +845,11 @@
       return firebaseDb.collection("users").doc(this._user.uid).collection("registros");
     },
 
+    _getBaixasCollection() {
+      if (!this._user || !firebaseDb) return null;
+      return firebaseDb.collection("users").doc(this._user.uid).collection("baixas");
+    },
+
     async signInWithGoogle() {
       if (!firebaseAuth) throw new Error("Firebase não inicializado");
       const provider = new firebase.auth.GoogleAuthProvider();
@@ -1070,15 +901,53 @@
 
     async _migrateLocalToFirestore() {
       const localData = this.getAllSync();
+      const localBaixas = this.getAllBaixasSync();
       const keys = Object.keys(localData);
-      if (keys.length === 0) return;
+      const baixaKeys = Object.keys(localBaixas);
+      if (keys.length === 0 && baixaKeys.length === 0) return;
       const col = this._getCollection();
-      if (!col) return;
+      const colBaixas = this._getBaixasCollection();
+      if (!col || !colBaixas) return;
 
       const batch = firebaseDb.batch();
       keys.forEach((key) => batch.set(col.doc(key), localData[key]));
+      baixaKeys.forEach((key) => batch.set(colBaixas.doc(key), localBaixas[key]));
       await batch.commit();
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(BAIXAS_STORAGE_KEY);
+    },
+
+    getAllBaixasSync() {
+      try {
+        return JSON.parse(localStorage.getItem(BAIXAS_STORAGE_KEY)) || {};
+      } catch {
+        return {};
+      }
+    },
+
+    async getAllBaixas() {
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getBaixasCollection();
+      if (!col) return this.getAllBaixasSync();
+
+      const snapshot = await col.get();
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = doc.data();
+      });
+      return data;
+    },
+
+    async addBaixa(dateKey, data) {
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getBaixasCollection();
+      if (col) {
+        await col.doc(dateKey).set(data);
+        return;
+      }
+      const all = this.getAllBaixasSync();
+      all[dateKey] = data;
+      localStorage.setItem(BAIXAS_STORAGE_KEY, JSON.stringify(all));
     },
   };
 
@@ -1088,6 +957,7 @@
     initPrimaryNavigation();
     initUserMenu();
     initImageModal();
+    initCameraModal();
 
     await Store.init();
 
@@ -1140,12 +1010,25 @@
     getPeriodLabel,
     shiftPaymentAnchor,
     abrirImagem,
+    abrirCameraModal,
     fecharImagem,
-    getComprovanteInfo: resolveComprovanteInfo,
+    getComprovanteInfo,
     formatComprovanteNome,
     formatComprovanteResumo,
     formatComprovanteTitulo,
     formatPeriodoComprovante,
+    COMPROVANTE_PERIODO_MESES,
+    startOfMonth,
+    addMonths,
+    getComprovanteCicloAtual,
+    getLocalizacaoTexto,
+    wrapText,
+    drawRoundedRect,
+    drawMetricCard,
+    drawCellText,
+    drawCellLines,
+    drawLogoImage,
+    baixarImagemRelatorio,
     goToHome,
     goToCalendario,
     goToRegistro,

@@ -3,22 +3,14 @@
   if (!App) return;
 
   const REG_POR_PAGINA = 6;
-  const COMPROVANTE_PERIODO_MESES = 6;
-  const COMPROVANTE_CICLO_KEY_PREFIX = "bancoHoras_comprovantes_primeiro_login";
   let registroAnchor = App.getCurrentPaymentAnchor();
   let regDadosPeriodo = [];
   let regDadosCiclo = [];
   let regPaginaAtual = 1;
   let comprovantePeriodos = [];
-  let logoDataUrl = null;
-
-  async function getLogoDataUrl() {
-    if (logoDataUrl) return logoDataUrl;
-    const response = await fetch("../assets/timewallet_logo_header.svg");
-    const svg = await response.text();
-    logoDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-    return logoDataUrl;
-  }
+  let ultimaBaixaKey = null;
+  let baixasCache = {};
+  let baixaIndiceAtual = 0;
 
   function getExtraClasse(extraMin) {
     return extraMin < 0 ? "negativo" : extraMin > 0 ? "positivo" : "neutro";
@@ -26,20 +18,6 @@
 
   function getExtraTexto(extraMin) {
     return App.formatarExtra(extraMin);
-  }
-
-  function getLocalizacaoTexto(localizacao) {
-    if (!localizacao) return "Não registrada";
-    if (localizacao.address) return localizacao.address;
-    if (localizacao.endereco) return localizacao.endereco;
-    return `${localizacao.lat.toFixed(5)}, ${localizacao.lng.toFixed(5)}`;
-  }
-
-  function getComprovanteResumo(dateKey, registro) {
-    if (App.getComprovanteInfo) {
-      return App.getComprovanteInfo(dateKey, registro?.comprovanteNome).resumo;
-    }
-    return registro?.comprovanteNome || "comprovante";
   }
 
   function getResumoLista(lista) {
@@ -52,24 +30,15 @@
     }, { total: 0, positivos: 0, negativos: 0, saldo: 0 });
   }
 
-  function getResumoPeriodo() {
-    return getResumoLista(regDadosPeriodo);
-  }
-
   function getResumoCiclo() {
     return getResumoLista(regDadosCiclo);
   }
 
-  function startOfMonth(date) {
-    return new Date(date.getFullYear(), date.getMonth(), 1);
-  }
-
-  function endOfMonth(date) {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-  }
-
-  function addMonths(date, months) {
-    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+  function getUltimaBaixaDoAno(baixas, ano) {
+    const chaves = Object.keys(baixas || {}).filter((key) => key.startsWith(`${ano}-`));
+    if (!chaves.length) return null;
+    chaves.sort();
+    return chaves[chaves.length - 1];
   }
 
   function formatMonthYear(date) {
@@ -80,62 +49,12 @@
     return `${String(start.getDate()).padStart(2, "0")}/${String(start.getMonth() + 1).padStart(2, "0")}/${start.getFullYear()} – ${String(end.getDate()).padStart(2, "0")}/${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
   }
 
-  function getComprovanteCicloKey() {
-    const uid = App.Store?.getCurrentUser?.()?.uid || "guest";
-    return `${COMPROVANTE_CICLO_KEY_PREFIX}_${uid}`;
-  }
-
-  function getComprovanteCicloBase() {
-    const key = getComprovanteCicloKey();
-    const salvo = localStorage.getItem(key);
-    if (salvo) {
-      const dataSalva = new Date(`${salvo}T00:00:00`);
-      if (!Number.isNaN(dataSalva.getTime())) return dataSalva;
-    }
-    const hoje = new Date();
-    localStorage.setItem(key, App.toKey(hoje));
-    return hoje;
-  }
-
-  function setComprovanteCicloBase(date) {
-    localStorage.setItem(getComprovanteCicloKey(), App.toKey(date));
-  }
-
-  function getComprovanteCicloAtual() {
-    let inicio = startOfMonth(getComprovanteCicloBase());
-    let fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
-    const hoje = new Date();
-
-    while (hoje > fim) {
-      inicio = addMonths(inicio, COMPROVANTE_PERIODO_MESES);
-      fim = App.getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
-      setComprovanteCicloBase(inicio);
-    }
-
-    return { start: inicio, end: fim };
-  }
-
-  function atualizarTextoCardComprovantes() {
-    const el = App.byId("comprovantePeriodoTexto");
-    if (!el) return;
-    const ciclo = getComprovanteCicloAtual();
-    el.textContent = `Selecione um dos 6 meses do ciclo atual (${getSemestralLabel(ciclo.start, ciclo.end)}).`;
-  }
-
-  function preencherPeriodosComprovante() {
-    const select = App.byId("comprovantePeriodoSelect");
-    if (!select) return;
-
-    const valorAtual = select.value;
-    const ciclo = getComprovanteCicloAtual();
-    const periodoAtual = App.getCurrentPaymentAnchor(new Date());
-    const periodoAtualKey = App.toKey(periodoAtual);
-    comprovantePeriodos = [];
-
-    for (let i = 0; i < COMPROVANTE_PERIODO_MESES; i += 1) {
-      const anchor = addMonths(ciclo.start, i);
+  function getPeriodosDoAno(ano) {
+    const periodos = [];
+    for (let mes = 0; mes < 12; mes += 1) {
+      const anchor = new Date(ano, mes, 1);
       const bounds = App.getPeriodBounds(anchor);
-      comprovantePeriodos.push({
+      periodos.push({
         value: App.toKey(anchor),
         anchor,
         start: bounds.start,
@@ -143,17 +62,26 @@
         label: getSemestralLabel(bounds.start, bounds.end),
       });
     }
+    return periodos;
+  }
+
+  function preencherPeriodosComprovante() {
+    const select = App.byId("comprovantePeriodoSelect");
+    if (!select) return;
+
+    const valorAtual = select.value;
+    const periodoAtual = App.getCurrentPaymentAnchor(new Date());
+    const periodoAtualKey = App.toKey(periodoAtual);
+    comprovantePeriodos = getPeriodosDoAno(new Date().getFullYear());
 
     select.innerHTML = comprovantePeriodos.map((periodo) => `<option value="${periodo.value}">${periodo.label}</option>`).join("");
     select.disabled = false;
     select.value = comprovantePeriodos.some((periodo) => periodo.value === valorAtual)
       ? valorAtual
-      : comprovantePeriodos.some((periodo) => periodo.value === periodoAtualKey)
-        ? periodoAtualKey
-        : comprovantePeriodos[0].value;
+      : periodoAtualKey;
 
     if (!comprovantePeriodos.some((periodo) => periodo.value === App.toKey(registroAnchor))) {
-      registroAnchor = comprovantePeriodos[0].anchor;
+      registroAnchor = periodoAtual;
     }
 
     atualizarTextoCardComprovantes();
@@ -217,8 +145,9 @@
   function atualizarTextoCardComprovantes() {
     const el = App.byId("comprovantePeriodoTexto");
     if (!el) return;
-    const ciclo = getComprovanteCicloAtual();
-    el.textContent = `Selecione um dos 6 períodos do ciclo atual (${getSemestralLabel(ciclo.start, ciclo.end)}).`;
+    const primeiro = comprovantePeriodos[0];
+    if (!primeiro) return;
+    el.textContent = `Selecione um dos 12 períodos de ${primeiro.anchor.getFullYear()}.`;
   }
 
   function getComprovantesPeriodoSelecionado(registros) {
@@ -297,6 +226,160 @@
     App.mostrarToast("Comprovantes baixados!");
   }
 
+  async function gerarImagemBaixa(baixa) {
+    const [ano, mes, dia] = String(baixa.data || "").split("-");
+    const dataFmt = ano ? `${dia}/${mes}/${ano}` : "—";
+    const nomeUsuario = App.obterNomeUsuario() || "—";
+    const linha = {
+      data: dataFmt,
+      localizacao: App.getLocalizacaoTexto(null),
+      saldo: App.formatarExtra(baixa.saldoBaixado || 0),
+      usuario: nomeUsuario,
+    };
+    const cols = [
+      { key: "data", label: "Data", width: 0.22, align: "left" },
+      { key: "localizacao", label: "Localização", width: 0.33, align: "left" },
+      { key: "saldo", label: "Saldo resgatado", width: 0.2, align: "right" },
+      { key: "usuario", label: "Nome do usuário", width: 0.25, align: "right" },
+    ];
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const totalW = 900;
+    const padding = 36;
+    const heroH = 110;
+    const headerH = 46;
+    const rowH = 70;
+    const footerH = 60;
+
+    const logoH = await App.drawLogoImage(ctx, totalW, padding, "../assets/timewallet_logo_header_black.svg", 420);
+    const titleTop = padding + logoH + 14;
+    const tableTop = titleTop + heroH + 54;
+    const totalH = tableTop + headerH + rowH + footerH + padding;
+
+    canvas.width = totalW * dpr;
+    canvas.height = totalH * dpr;
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = "#F7F5EE";
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    if (logoH) await App.drawLogoImage(ctx, totalW, padding, "../assets/timewallet_logo_header_black.svg", 420);
+
+    ctx.fillStyle = "#20291A";
+    ctx.font = '700 26px Georgia, "Times New Roman", serif';
+    ctx.textAlign = "center";
+    ctx.fillText("Comprovante de Baixa", totalW / 2, titleTop + 6);
+
+    ctx.fillStyle = "#7A8570";
+    ctx.font = "600 13px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(`Registrado em ${dataFmt} às ${baixa.horario || "--:--"}`, totalW / 2, titleTop + 28);
+
+    const heroY = titleTop + 44;
+    App.drawRoundedRect(ctx, padding, heroY, totalW - padding * 2, heroH, 28, "#AEB49E", null);
+
+    ctx.fillStyle = "rgba(255,255,255,.82)";
+    ctx.font = "700 13px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Saldo resgatado", padding + 28, heroY + 34);
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "700 38px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(App.formatarExtra(baixa.saldoBaixado || 0), padding + 28, heroY + 76);
+
+    ctx.font = "700 24px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(nomeUsuario, totalW - padding - 28, heroY + 55);
+
+    App.drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, headerH + rowH, 28, "#FFFFFF", "#AEB7A0");
+
+    let x = padding;
+    cols.forEach((col, index) => {
+      const colW = (totalW - padding * 2) * col.width;
+      App.drawCellText(ctx, col.label, x, tableTop, colW, headerH, col.align, "#000000", "700 16px -apple-system, BlinkMacSystemFont, sans-serif", 1);
+      if (index < cols.length - 1) {
+        ctx.strokeStyle = "#B2BAA7";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + colW, tableTop + 8);
+        ctx.lineTo(x + colW, tableTop + headerH + rowH - 8);
+        ctx.stroke();
+      }
+      x += colW;
+    });
+
+    ctx.strokeStyle = "#98A18E";
+    ctx.lineWidth = 1.7;
+    ctx.beginPath();
+    ctx.moveTo(padding + 1, tableTop + headerH);
+    ctx.lineTo(totalW - padding - 1, tableTop + headerH);
+    ctx.stroke();
+
+    let colX = padding;
+    cols.forEach((col) => {
+      const colW = (totalW - padding * 2) * col.width;
+      App.drawCellText(ctx, linha[col.key], colX, tableTop + headerH, colW, rowH, col.align, "#20291A", "700 16px -apple-system, BlinkMacSystemFont, sans-serif", 2);
+      colX += colW;
+    });
+
+    ctx.fillStyle = "#000000";
+    ctx.font = "700 13px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, tableTop + headerH + rowH + 32);
+
+    const nomeArquivo = `baixa_${dataFmt.replace(/\//g, "-")}.png`;
+    const dataUrl = canvas.toDataURL("image/png");
+    await new Promise((resolve) => canvas.toBlob((blob) => {
+      App.baixarImagemRelatorio(blob, nomeArquivo);
+      resolve();
+    }, "image/png"));
+    return { dataUrl, nomeArquivo };
+  }
+
+  async function salvarBaixa(foto, saldoBaixado) {
+    const agora = new Date();
+    const hojeKey = App.toKey(agora);
+    const horario = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
+    const nome = App.formatComprovanteNome ? App.formatComprovanteNome(hojeKey, "baixa.jpg") : `baixa_${hojeKey}.jpg`;
+    const baixaData = {
+      data: hojeKey,
+      horario,
+      saldoBaixado,
+      comprovante: foto,
+      comprovanteNome: nome,
+    };
+    const recibo = await gerarImagemBaixa(baixaData);
+    baixaData.recibo = recibo.dataUrl;
+    baixaData.reciboNome = recibo.nomeArquivo;
+    await App.Store.addBaixa(hojeKey, baixaData);
+    App.mostrarToast("Baixa de saldo registrada!");
+    baixaIndiceAtual = 0;
+    await renderRegistro();
+  }
+
+  function confirmarESalvarBaixa(foto, saldoBaixado) {
+    const confirmado = confirm(`Tem certeza que quer dar baixa no saldo de ${App.formatarExtra(saldoBaixado)}? Essa ação zera o saldo acumulado a partir de hoje.`);
+    if (!confirmado) return;
+    salvarBaixa(foto, saldoBaixado);
+  }
+
+  async function confirmarBaixaSaldo() {
+    const resumoAtual = getResumoCiclo();
+    if (resumoAtual.total === 0) {
+      App.mostrarToast("Não há saldo acumulado pra dar baixa.");
+      return;
+    }
+
+    const resultado = await App.abrirCameraModal();
+    if (resultado === "unsupported") {
+      App.byId("baixaCamera")?.click();
+      return;
+    }
+    if (!resultado) return;
+    confirmarESalvarBaixa(resultado, resumoAtual.saldo);
+  }
+
   function atualizarResumoTela() {
     const resumo = getResumoCiclo();
     const hero = App.byId("registroHero");
@@ -308,19 +391,119 @@
 
     if (hero) {
       hero.classList.toggle("hero-muted", resumo.saldo === 0);
-      hero.style.background = "#7B846D";
+      hero.style.background = "#AEB49E";
     }
     if (saldoEl) {
       saldoEl.textContent = App.formatarExtra(resumo.saldo);
       saldoEl.style.color = "#fff";
     }
     if (periodoAtual) {
-      const ciclo = getComprovanteCicloAtual();
-      periodoAtual.textContent = `Ciclo atual (${getSemestralLabel(ciclo.start, ciclo.end)})`;
+      const primeiro = comprovantePeriodos[0];
+      periodoAtual.textContent = primeiro ? `Ano de ${primeiro.anchor.getFullYear()}` : "—";
     }
     if (countEl) countEl.textContent = String(resumo.total);
     if (positivosEl) positivosEl.textContent = String(resumo.positivos);
     if (negativosEl) negativosEl.textContent = String(resumo.negativos);
+
+    const baixaTexto = App.byId("baixaSaldoTexto");
+    const baixaBtn = App.byId("baixaSaldoBtn");
+    if (baixaTexto) baixaTexto.textContent = `Saldo atual: ${App.formatarExtra(resumo.saldo)}`;
+    if (baixaBtn) baixaBtn.disabled = resumo.total === 0;
+  }
+
+  function getBaixasOrdenadas(baixas) {
+    return Object.values(baixas || {}).sort((a, b) => `${b.data}${b.horario || ""}`.localeCompare(`${a.data}${a.horario || ""}`));
+  }
+
+  function moverBaixa(direcao) {
+    const itens = getBaixasOrdenadas(baixasCache);
+    const proximoIndice = baixaIndiceAtual + direcao;
+    if (proximoIndice < 0 || proximoIndice >= itens.length) return;
+    baixaIndiceAtual = proximoIndice;
+    renderHistoricoBaixas(baixasCache);
+  }
+
+  function renderHistoricoBaixas(baixas) {
+    baixasCache = baixas || {};
+    const lista = App.byId("baixasHistorico");
+    const nav = App.byId("baixasNav");
+    const indicador = App.byId("baixaIndicador");
+    const prevBtn = App.byId("baixaPrevBtn");
+    const nextBtn = App.byId("baixaNextBtn");
+    if (!lista) return;
+
+    const itens = getBaixasOrdenadas(baixasCache);
+    if (!itens.length) {
+      if (nav) nav.hidden = true;
+      lista.innerHTML = '<div class="detail-card detail-card-rich"><div class="empty-msg">Nenhuma baixa registrada ainda.</div></div>';
+      return;
+    }
+
+    if (baixaIndiceAtual >= itens.length) baixaIndiceAtual = itens.length - 1;
+    if (baixaIndiceAtual < 0) baixaIndiceAtual = 0;
+
+    if (nav) nav.hidden = false;
+    if (indicador) indicador.textContent = `${baixaIndiceAtual + 1} de ${itens.length}`;
+    if (prevBtn) prevBtn.disabled = baixaIndiceAtual <= 0;
+    if (nextBtn) nextBtn.disabled = baixaIndiceAtual >= itens.length - 1;
+
+    const item = itens[baixaIndiceAtual];
+    const [ano, mes, dia] = String(item.data || "").split("-");
+    const dataFmt = ano ? `${dia}/${mes}/${ano}` : "—";
+    const fotoNome = item.comprovanteNome || "foto.jpg";
+    const reciboBloco = item.recibo
+      ? `
+          <img class="da-thumb" id="baixaReciboThumb" src="${item.recibo}" alt="Comprovante gerado">
+          <div class="da-info">
+            <div class="da-nome">${item.reciboNome || "comprovante.png"}</div>
+            <div class="da-actions">
+              <button class="da-btn" id="baixaVerRecibo" type="button"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>Visualizar</span></button>
+              <a class="da-btn" href="${item.recibo}" download="${item.reciboNome || "comprovante.png"}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg><span>Baixar</span></a>
+            </div>
+          </div>`
+      : '<div class="empty-msg">Comprovante não disponível.</div>';
+
+    lista.innerHTML = `
+      <div class="detail-card detail-card-rich">
+        <div class="detail-info">
+          <div class="di-row">
+            <div class="di-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+            <div class="di-text"><span class="di-k">Dia</span><span class="di-v">${dataFmt}</span></div>
+          </div>
+          <div class="di-row">
+            <div class="di-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg></div>
+            <div class="di-text"><span class="di-k">Horário</span><span class="di-v">${item.horario || "—"}</span></div>
+          </div>
+          <div class="di-row">
+            <div class="di-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"></path><path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3c1.66 0 3.22.45 4.56 1.24"></path><path d="M16 3h5v5"></path></svg></div>
+            <div class="di-text"><span class="di-k">Saldo</span><span class="di-v">${App.formatarExtra(item.saldoBaixado || 0)}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-anexo">
+          <div class="da-head">Foto da baixa</div>
+          <div class="da-body">
+            <img class="da-thumb" id="baixaFotoThumb" src="${item.comprovante || ""}" alt="Foto da baixa">
+            <div class="da-info">
+              <div class="da-nome">${fotoNome}</div>
+              <div class="da-actions">
+                <button class="da-btn" id="baixaVerFoto" type="button"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>Visualizar</span></button>
+                <a class="da-btn" href="${item.comprovante || ""}" download="${fotoNome}"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg><span>Baixar</span></a>
+              </div>
+            </div>
+          </div>
+
+          <div class="da-head" style="margin-top:14px;padding-top:14px;border-top:1px solid #ECEFE6;">Comprovante gerado</div>
+          <div class="da-body">${reciboBloco}</div>
+        </div>
+      </div>`;
+
+    App.on("baixaFotoThumb", "click", () => App.abrirImagem(item.comprovante));
+    App.on("baixaVerFoto", "click", () => App.abrirImagem(item.comprovante));
+    if (item.recibo) {
+      App.on("baixaReciboThumb", "click", () => App.abrirImagem(item.recibo));
+      App.on("baixaVerRecibo", "click", () => App.abrirImagem(item.recibo));
+    }
   }
 
   async function renderRegistro() {
@@ -330,6 +513,10 @@
     atualizarCabecalhoPeriodo();
     const { start, end } = App.getPeriodBounds(registroAnchor);
     const registros = await App.Store.getAll();
+    const baixas = await App.Store.getAllBaixas();
+    const anoCiclo = comprovantePeriodos[0]?.anchor.getFullYear() ?? new Date().getFullYear();
+    ultimaBaixaKey = getUltimaBaixaDoAno(baixas, anoCiclo);
+    renderHistoricoBaixas(baixas);
     regDadosPeriodo = [];
     regDadosCiclo = [];
 
@@ -339,6 +526,7 @@
         const key = App.toKey(date);
         const reg = registros[key];
         if (!reg) continue;
+        if (ultimaBaixaKey && key <= ultimaBaixaKey) continue;
         regDadosCiclo.push({ key, date, reg });
       }
     });
@@ -374,7 +562,6 @@
       return `
         <div class="reg-row ${estado}">
           <span class="col-dia">${diaLabel}</span>
-          <span class="col-ponto">15:00</span>
           <span class="col-saida">${reg.saida}</span>
           <span class="col-local">${localizacao}</span>
           <span class="col-horas">${getExtraTexto(reg.extraMin)}</span>
@@ -401,254 +588,6 @@
     });
   }
 
-  function wrapText(ctx, text, maxWidth, maxLines = 2) {
-    const words = String(text || "—").split(/\s+/).filter(Boolean);
-    const lines = [];
-    let current = "";
-
-    words.forEach((word) => {
-      const test = current ? `${current} ${word}` : word;
-      if (ctx.measureText(test).width <= maxWidth || !current) {
-        current = test;
-        return;
-      }
-      lines.push(current);
-      current = word;
-    });
-
-    if (current) lines.push(current);
-    if (lines.length <= maxLines) return lines;
-
-    const limited = lines.slice(0, maxLines);
-    const last = limited[maxLines - 1];
-    limited[maxLines - 1] = last.length > 2 ? `${last.slice(0, Math.max(0, last.length - 2))}…` : `${last}…`;
-    return limited;
-  }
-
-  function drawRoundedRect(ctx, x, y, width, height, radius, fillStyle, strokeStyle) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
-    ctx.closePath();
-    if (fillStyle) {
-      ctx.fillStyle = fillStyle;
-      ctx.fill();
-    }
-    if (strokeStyle) {
-      ctx.strokeStyle = strokeStyle;
-      ctx.stroke();
-    }
-  }
-
-  async function drawLogo(ctx, totalW, padding) {
-    try {
-      const logoSrc = await getLogoDataUrl();
-      const img = new Image();
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = logoSrc;
-      });
-      const maxW = 190;
-      const ratio = img.width / img.height;
-      const width = maxW;
-      const height = width / ratio;
-      ctx.drawImage(img, (totalW - width) / 2, padding, width, height);
-      return height;
-    } catch {
-      return 0;
-    }
-  }
-
-  function drawMetricCard(ctx, x, y, width, height, label, value, accent) {
-    drawRoundedRect(ctx, x, y, width, height, 22, "#FFFFFF", "#E6EBDB");
-    ctx.fillStyle = "#7A8570";
-    ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(label, x + 18, y + 24);
-    ctx.fillStyle = accent;
-    ctx.font = "700 28px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(String(value), x + 18, y + 58);
-  }
-
-  function drawCellText(ctx, value, x, y, width, height, align, color, font, maxLines = 2) {
-    ctx.fillStyle = color;
-    ctx.font = font;
-    ctx.textAlign = align;
-    const pad = 10;
-    const maxWidth = Math.max(24, width - pad * 2);
-    const lines = wrapText(ctx, value, maxWidth, maxLines);
-    const lineHeight = 14;
-    const totalHeight = lines.length * lineHeight;
-    const baseX = align === "left" ? x + pad : align === "right" ? x + width - pad : x + width / 2;
-    let currentY = y + (height - totalHeight) / 2 + 11;
-    lines.forEach((line) => {
-      ctx.fillText(line, baseX, currentY);
-      currentY += lineHeight;
-    });
-  }
-
-  function baixarImagem(blob, start, end) {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const nomeArquivo = `banco-horas_${App.fmtCurta(start).replace("/", "-")}_a_${App.fmtCurta(end).replace("/", "-")}-${end.getFullYear()}.png`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nomeArquivo;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    App.mostrarToast("Imagem salva!");
-  }
-
-  async function gerarImagem() {
-    if (regDadosPeriodo.length === 0) {
-      alert("Sem registros no período para gerar imagem.");
-      return;
-    }
-
-    const { start, end } = App.getPeriodBounds(registroAnchor);
-    const resumo = getResumoPeriodo();
-    const dados = regDadosPeriodo.map(({ key, date, reg }) => ({
-      dia: `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
-      ponto: "15:00",
-      saida: reg.saida,
-      localizacao: getLocalizacaoTexto(reg.localizacao),
-      comprovante: getComprovanteResumo(key, reg),
-      saldo: getExtraTexto(reg.extraMin),
-      estado: getExtraClasse(reg.extraMin),
-    }));
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const dpr = window.devicePixelRatio || 1;
-    const totalW = 1120;
-    const padding = 36;
-    const metricGap = 16;
-    const metricH = 82;
-    const heroH = 110;
-    const headerH = 46;
-    const rowH = 58;
-    const footerH = 68;
-    const cols = [
-      { key: "dia", label: "Dia", width: 0.23, align: "left" },
-      { key: "ponto", label: "Ponto", width: 0.09, align: "center" },
-      { key: "saida", label: "Saída", width: 0.11, align: "center" },
-      { key: "localizacao", label: "Localização", width: 0.28, align: "left" },
-      { key: "comprovante", label: "Comprovante", width: 0.17, align: "left" },
-      { key: "saldo", label: "Saldo", width: 0.12, align: "right" },
-    ];
-
-    const logoH = await drawLogo(ctx, totalW, padding);
-    const titleTop = padding + logoH + 14;
-    const tableTop = titleTop + heroH + metricH + 54;
-    const totalH = tableTop + headerH + dados.length * rowH + footerH + padding;
-
-    canvas.width = totalW * dpr;
-    canvas.height = totalH * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.fillStyle = "#F7F5EE";
-    ctx.fillRect(0, 0, totalW, totalH);
-
-    if (logoH) await drawLogo(ctx, totalW, padding);
-
-    ctx.fillStyle = "#20291A";
-    ctx.font = '700 28px Georgia, "Times New Roman", serif';
-    ctx.textAlign = "center";
-    ctx.fillText("Banco de Horas", totalW / 2, titleTop + 6);
-
-    ctx.fillStyle = "#7A8570";
-    ctx.font = "600 14px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(`Período ${App.getPeriodLabel(registroAnchor)}`, totalW / 2, titleTop + 30);
-
-    const heroY = titleTop + 48;
-    const heroBg = "#7B846D";
-    drawRoundedRect(ctx, padding, heroY, totalW - padding * 2, heroH, 28, heroBg, null);
-
-    ctx.fillStyle = "rgba(255,255,255,.82)";
-    ctx.font = "700 13px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("Saldo do período", padding + 28, heroY + 34);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "700 38px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(App.formatarExtra(resumo.saldo), padding + 28, heroY + 76);
-
-    ctx.font = "600 13px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(`${resumo.total} registro${resumo.total === 1 ? "" : "s"}`, totalW - padding - 28, heroY + 50);
-
-    const metricY = heroY + heroH + 18;
-    const metricW = (totalW - padding * 2 - metricGap * 2) / 3;
-    drawMetricCard(ctx, padding, metricY, metricW, metricH, "Registros", resumo.total, "#20291A");
-    drawMetricCard(ctx, padding + metricW + metricGap, metricY, metricW, metricH, "Extras", resumo.positivos, "#4A701C");
-    drawMetricCard(ctx, padding + (metricW + metricGap) * 2, metricY, metricW, metricH, "Descontos", resumo.negativos, "#B3261E");
-
-    drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, headerH + dados.length * rowH, 28, "#FFFFFF", "#E6EBDB");
-
-    let x = padding;
-    cols.forEach((col, index) => {
-      const colW = (totalW - padding * 2) * col.width;
-      drawCellText(ctx, col.label, x, tableTop, colW, headerH, col.align, "#4A701C", "700 12px -apple-system, BlinkMacSystemFont, sans-serif", 1);
-      if (index < cols.length - 1) {
-        ctx.strokeStyle = "#EEF2E7";
-        ctx.beginPath();
-        ctx.moveTo(x + colW, tableTop + 10);
-        ctx.lineTo(x + colW, tableTop + headerH + dados.length * rowH - 10);
-        ctx.stroke();
-      }
-      x += colW;
-    });
-
-    let y = tableTop + headerH;
-    dados.forEach((row, index) => {
-      if (index > 0) {
-        ctx.strokeStyle = "#EEF2E7";
-        ctx.beginPath();
-        ctx.moveTo(padding, y);
-        ctx.lineTo(totalW - padding, y);
-        ctx.stroke();
-      }
-
-      let colX = padding;
-      cols.forEach((col) => {
-        const colW = (totalW - padding * 2) * col.width;
-        const isSaldo = col.key === "saldo";
-        const isSaida = col.key === "saida";
-        const color = isSaldo
-          ? row.estado === "positivo"
-            ? "#4A701C"
-            : row.estado === "negativo"
-              ? "#B3261E"
-              : "#6F7862"
-          : isSaida && row.estado === "negativo"
-            ? "#B3261E"
-            : isSaida && row.estado === "positivo"
-              ? "#375215"
-              : "#20291A";
-        const font = isSaldo || isSaida
-          ? "700 12px -apple-system, BlinkMacSystemFont, sans-serif"
-          : "12px -apple-system, BlinkMacSystemFont, sans-serif";
-        drawCellText(ctx, row[col.key], colX, y, colW, rowH, col.align, color, font, col.key === "localizacao" ? 3 : 2);
-        colX += colW;
-      });
-      y += rowH;
-    });
-
-    ctx.fillStyle = "#7A8570";
-    ctx.font = "12px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, y + 36);
-
-    canvas.toBlob((blob) => baixarImagem(blob, start, end), "image/png");
-  }
-
   App.on("regPrevPeriod", "click", async () => {
     if (!moverPeriodoRegistro(-1)) return;
     await renderRegistro();
@@ -659,8 +598,39 @@
     await renderRegistro();
   });
 
+  function selecionarVisualizacao(valor) {
+    const viewRegistros = App.byId("viewRegistros");
+    const viewBaixas = App.byId("viewBaixas");
+    const opcaoRegistros = App.byId("visOpcaoRegistros");
+    const opcaoBaixas = App.byId("visOpcaoBaixas");
+    if (!viewRegistros || !viewBaixas) return;
+    const ehBaixas = valor === "baixas";
+    viewRegistros.hidden = ehBaixas;
+    viewBaixas.hidden = !ehBaixas;
+    if (opcaoRegistros) opcaoRegistros.classList.toggle("is-active", !ehBaixas);
+    if (opcaoBaixas) opcaoBaixas.classList.toggle("is-active", ehBaixas);
+  }
+
+  App.on("visOpcaoRegistros", "click", () => selecionarVisualizacao("registros"));
+  App.on("visOpcaoBaixas", "click", () => selecionarVisualizacao("baixas"));
+  selecionarVisualizacao("registros");
+
   initSelectPeriodoComprovante();
   App.on("baixarComprovantesBtn", "click", baixarComprovantesPeriodo);
+  App.on("baixaSaldoBtn", "click", confirmarBaixaSaldo);
+  App.on("baixaPrevBtn", "click", () => moverBaixa(-1));
+  App.on("baixaNextBtn", "click", () => moverBaixa(1));
+  App.on("baixaCamera", "change", (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    const resumoAtual = getResumoCiclo();
+    const reader = new FileReader();
+    reader.onload = () => {
+      confirmarESalvarBaixa(reader.result, resumoAtual.saldo);
+    };
+    reader.readAsDataURL(file);
+  });
 
   App.initShell({
     onReady: async () => {
