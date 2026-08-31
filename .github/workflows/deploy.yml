@@ -37,7 +37,7 @@ jobs:
           }
 
           const config = JSON.parse(raw);
-          const requiredKeys = [
+          const noWhitespaceKeys = [
             'apiKey',
             'authDomain',
             'projectId',
@@ -46,16 +46,15 @@ jobs:
             'appId',
           ];
 
-          const missingKeys = requiredKeys.filter((key) => !config[key]);
+          noWhitespaceKeys.forEach((key) => {
+            if (typeof config[key] === 'string') {
+              config[key] = config[key].replace(/\s+/g, '');
+            }
+          });
+
+          const missingKeys = noWhitespaceKeys.filter((key) => !config[key]);
           if (missingKeys.length > 0) {
             throw new Error(`Invalid FIREBASE_CONFIG secret. Missing: ${missingKeys.join(', ')}`);
-          }
-
-          const whitespaceKeys = requiredKeys.filter(
-            (key) => typeof config[key] === 'string' && /\s/.test(config[key])
-          );
-          if (whitespaceKeys.length > 0) {
-            throw new Error(`Invalid FIREBASE_CONFIG secret. Whitespace found in: ${whitespaceKeys.join(', ')}`);
           }
 
           fs.writeFileSync('config.js', `window.FIREBASE_CONFIG = ${JSON.stringify(config)};\n`);
