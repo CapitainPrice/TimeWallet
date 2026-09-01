@@ -230,7 +230,10 @@ input[type="time"]{display:none;}
 }
 .fa-btn svg{width:15px;height:15px;stroke:var(--primary-dark);}
 .form-manual .label-ico,.form-manual .fa-btn{background:#F0F0F0;}
-.geo-status{margin-top:10px;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:5px;}
+.geo-status{margin-top:10px;font-size:11px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;}
+.detail-hero .geo-status{color:rgba(255,255,255,.85);}
+.geo-retry-btn{background:rgba(255,255,255,.22);color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;}
+.geo-retry-btn:active{background:rgba(255,255,255,.34);}
 .hero-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;text-align:left;}
 .hero-meta-item{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;backdrop-filter:blur(6px);}
 .hero-meta-label{display:block;font-size:10px;font-weight:700;letter-spacing:.35px;text-transform:uppercase;opacity:.78;}

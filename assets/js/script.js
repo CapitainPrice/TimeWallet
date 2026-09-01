@@ -109,11 +109,38 @@
     doneStatus.style.display = "flex";
   }
 
-  function exibirStatusGeo(texto) {
+  let geoRetryOnFocus = null;
+
+  function exibirStatusGeo(texto, { retry = false } = {}) {
     const el = App.byId("geoStatus");
     if (!el) return;
     el.style.display = "flex";
-    el.textContent = texto;
+    el.innerHTML = "";
+    const span = document.createElement("span");
+    span.textContent = texto;
+    el.appendChild(span);
+
+    if (geoRetryOnFocus) {
+      document.removeEventListener("visibilitychange", geoRetryOnFocus);
+      geoRetryOnFocus = null;
+    }
+
+    if (retry) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "geo-retry-btn";
+      btn.textContent = "Tentar novamente";
+      btn.addEventListener("click", () => capturarLocalizacao());
+      el.appendChild(btn);
+
+      geoRetryOnFocus = () => {
+        if (document.visibilityState !== "visible") return;
+        document.removeEventListener("visibilitychange", geoRetryOnFocus);
+        geoRetryOnFocus = null;
+        capturarLocalizacao();
+      };
+      document.addEventListener("visibilitychange", geoRetryOnFocus);
+    }
   }
 
   function preencherHorarioAtual() {
@@ -249,32 +276,50 @@
       return;
     }
 
-    exibirStatusGeo("Obtendo localização...");
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        comprovanteLocalizacao = { lat, lng };
-        exibirStatusGeo("Obtendo endereço...");
-        const address = await App.reverseGeocode(lat, lng);
-        comprovanteLocalizacao.address = address;
-        exibirStatusGeo(`Localização: ${address}`);
-        await salvarLocalizacaoRegistroHoje();
-      },
-      (error) => {
-        comprovanteLocalizacao = null;
-        if (error?.code === error.PERMISSION_DENIED) {
-          exibirStatusGeo("Permita a localização no navegador para salvar o endereço");
-          return;
-        }
-        if (error?.code === error.TIMEOUT) {
-          exibirStatusGeo("A localização demorou demais para responder");
-          return;
-        }
-        exibirStatusGeo("Não foi possível obter a localização");
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+    const tentarObter = () => {
+      exibirStatusGeo("Obtendo localização...");
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          comprovanteLocalizacao = { lat, lng };
+          exibirStatusGeo("Obtendo endereço...");
+          const address = await App.reverseGeocode(lat, lng);
+          comprovanteLocalizacao.address = address;
+          exibirStatusGeo(`Localização: ${address}`);
+          await salvarLocalizacaoRegistroHoje();
+        },
+        (error) => {
+          comprovanteLocalizacao = null;
+          if (error?.code === error.PERMISSION_DENIED) {
+            exibirStatusGeo("Permita a localização nas permissões do navegador e tente novamente", { retry: true });
+            return;
+          }
+          if (error?.code === error.TIMEOUT) {
+            exibirStatusGeo("A localização demorou demais para responder", { retry: true });
+            return;
+          }
+          exibirStatusGeo("Ative a localização do dispositivo e tente novamente", { retry: true });
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    };
+
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((status) => {
+          if (status.state === "denied") {
+            exibirStatusGeo("Localização bloqueada para este site. Habilite nas permissões do navegador e tente novamente", { retry: true });
+            return;
+          }
+          tentarObter();
+        })
+        .catch(tentarObter);
+      return;
+    }
+
+    tentarObter();
   }
 
   async function abrirCamera() {
