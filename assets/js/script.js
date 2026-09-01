@@ -167,10 +167,17 @@
     const horarioCapturado = App.byId("horarioCapturado");
     if (!box || !tempoExtraLabel || !tempoExtra || !horarioCapturado) return;
 
-    box.classList.toggle("hero-muted", min === 0);
-    box.style.background = min < 0 ? "#B3261E" : min === 0 ? "#AEB49E" : "#4A701C";
-    box.style.color = "#fff";
-    tempoExtraLabel.textContent = min < 0 ? "Desconto" : min === 0 ? "Neutro" : "Tempo extra";
+    if (min === 0) {
+      box.classList.add("hero-muted");
+      box.style.background = "#AEB49E";
+      box.style.color = "#fff";
+      tempoExtraLabel.textContent = "Neutro";
+    } else {
+      box.classList.remove("hero-muted");
+      box.style.background = "#AEB49E";
+      box.style.color = "#fff";
+      tempoExtraLabel.textContent = min < 0 ? "Desconto" : "Tempo extra";
+    }
 
     tempoExtra.textContent = App.formatarExtra(min);
     horarioCapturado.textContent = `Saída registrada às ${horario}`;
