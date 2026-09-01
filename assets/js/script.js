@@ -192,6 +192,7 @@
     atualizarMetaComprovante(hojeKey, comprovanteNome);
     mostrarResultado(reg.extraMin, reg.saida);
     atualizarTravaRegistroHoje(true);
+    if (!comprovanteLocalizacao) capturarLocalizacao();
   }
 
   async function salvarRegistroHoje() {
@@ -265,33 +266,46 @@
       return;
     }
 
-    const tentarObter = () => {
+    const obterPosicao = (opcoes) =>
+      new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, opcoes);
+      });
+
+    const tentarObter = async () => {
       exibirStatusGeo("Obtendo localização...");
-      navigator.geolocation.getCurrentPosition(
-        async (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          comprovanteLocalizacao = { lat, lng };
-          exibirStatusGeo("Obtendo endereço...");
-          const address = await App.reverseGeocode(lat, lng);
-          comprovanteLocalizacao.address = address;
-          exibirStatusGeo(address);
-          await salvarLocalizacaoRegistroHoje();
-        },
-        (error) => {
+      let pos;
+      try {
+        pos = await obterPosicao({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+      } catch (error) {
+        if (error?.code === error.PERMISSION_DENIED) {
           comprovanteLocalizacao = null;
-          if (error?.code === error.PERMISSION_DENIED) {
-            exibirStatusGeo("Permita a localização nas permissões do navegador e tente novamente", { retry: true });
-            return;
-          }
-          if (error?.code === error.TIMEOUT) {
+          exibirStatusGeo("Permita a localização nas permissões do navegador e tente novamente", { retry: true });
+          return;
+        }
+        if (error?.code === error.TIMEOUT) {
+          try {
+            exibirStatusGeo("Ainda obtendo localização (tentando via rede)...");
+            pos = await obterPosicao({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+          } catch (segundoErro) {
+            comprovanteLocalizacao = null;
             exibirStatusGeo("A localização demorou demais para responder", { retry: true });
             return;
           }
+        } else {
+          comprovanteLocalizacao = null;
           exibirStatusGeo("Ative a localização do dispositivo e tente novamente", { retry: true });
-        },
-        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-      );
+          return;
+        }
+      }
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      comprovanteLocalizacao = { lat, lng };
+      exibirStatusGeo("Obtendo endereço...");
+      const address = await App.reverseGeocode(lat, lng);
+      comprovanteLocalizacao.address = address;
+      exibirStatusGeo(address);
+      await salvarLocalizacaoRegistroHoje();
     };
 
     if (navigator.permissions?.query) {
