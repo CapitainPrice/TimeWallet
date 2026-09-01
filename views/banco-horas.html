@@ -172,16 +172,25 @@
   </div>
 
   <div class="cam-modal" id="camModal">
+    <div class="cam-topbar">
+      <button class="cam-close-btn" id="camFecharX" type="button" aria-label="Fechar câmera">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <span class="cam-topbar-title">Registro de ponto</span>
+      <span class="cam-topbar-spacer"></span>
+    </div>
+    <div class="cam-frame" id="camFrame"></div>
     <video id="camVideo" autoplay playsinline muted></video>
     <img id="camPreview" style="display:none;">
     <div class="cam-question" id="camQuestion" style="display:none;">Foto ficou boa?</div>
-    <div class="cam-actions" id="camActionsLive">
-      <button class="fa-btn cam-cancel" id="camCancelar" type="button">Cancelar</button>
-      <button class="btn" id="camCapturar" type="button" style="margin-top:0;">Capturar foto</button>
+    <div class="cam-actions cam-actions-live" id="camActionsLive">
+      <button class="cam-text-btn cam-cancel" id="camCancelar" type="button">Cancelar</button>
+      <button class="cam-shutter-btn" id="camCapturar" type="button" aria-label="Capturar foto"><span></span></button>
+      <span class="cam-actions-spacer"></span>
     </div>
     <div class="cam-actions" id="camActionsPreview" style="display:none;">
-      <button class="fa-btn cam-cancel" id="camMudar" type="button">Mudar</button>
-      <button class="btn" id="camFeito" type="button" style="margin-top:0;">Feito!</button>
+      <button class="cam-outline-btn cam-cancel" id="camMudar" type="button">Mudar</button>
+      <button class="cam-confirm-btn" id="camFeito" type="button">Feito!</button>
     </div>
   </div>
   <canvas id="camCanvas" style="display:none;"></canvas>

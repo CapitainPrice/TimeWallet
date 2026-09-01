@@ -65,14 +65,27 @@
     return periodos;
   }
 
-  function preencherPeriodosComprovante() {
+  function periodoTemRegistro(periodo, registros) {
+    for (let d = new Date(periodo.start); d <= periodo.end; d.setDate(d.getDate() + 1)) {
+      if (registros[App.toKey(d)]) return true;
+    }
+    return false;
+  }
+
+  function getPeriodosComRegistro(ano, registros) {
+    const todos = getPeriodosDoAno(ano);
+    const periodoAtualKey = App.toKey(App.getCurrentPaymentAnchor(new Date()));
+    return todos.filter((periodo) => periodo.value === periodoAtualKey || periodoTemRegistro(periodo, registros));
+  }
+
+  function preencherPeriodosComprovante(registros) {
     const select = App.byId("comprovantePeriodoSelect");
     if (!select) return;
 
     const valorAtual = select.value;
     const periodoAtual = App.getCurrentPaymentAnchor(new Date());
     const periodoAtualKey = App.toKey(periodoAtual);
-    comprovantePeriodos = getPeriodosDoAno(new Date().getFullYear());
+    comprovantePeriodos = getPeriodosComRegistro(new Date().getFullYear(), registros);
 
     select.innerHTML = comprovantePeriodos.map((periodo) => `<option value="${periodo.value}">${periodo.label}</option>`).join("");
     select.disabled = false;
@@ -147,7 +160,11 @@
     if (!el) return;
     const primeiro = comprovantePeriodos[0];
     if (!primeiro) return;
-    el.textContent = `Selecione um dos 12 períodos de ${primeiro.anchor.getFullYear()}.`;
+    const ano = primeiro.anchor.getFullYear();
+    const qtd = comprovantePeriodos.length;
+    el.textContent = qtd === 1
+      ? `Período de ${ano} com registro até agora.`
+      : `Selecione um dos ${qtd} períodos de ${ano} com registro até agora.`;
   }
 
   function getComprovantesPeriodoSelecionado(registros) {
@@ -509,11 +526,11 @@
   async function renderRegistro() {
     if (!App.byId("regPeriodoLabel")) return;
 
-    preencherPeriodosComprovante();
-    atualizarCabecalhoPeriodo();
-    const { start, end } = App.getPeriodBounds(registroAnchor);
     const registros = await App.Store.getAll();
     const baixas = await App.Store.getAllBaixas();
+    preencherPeriodosComprovante(registros);
+    atualizarCabecalhoPeriodo();
+    const { start, end } = App.getPeriodBounds(registroAnchor);
     const anoCiclo = comprovantePeriodos[0]?.anchor.getFullYear() ?? new Date().getFullYear();
     ultimaBaixaKey = getUltimaBaixaDoAno(baixas, anoCiclo);
     renderHistoricoBaixas(baixas);

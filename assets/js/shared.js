@@ -628,6 +628,7 @@
 
   function initCameraModal() {
     on("camCancelar", "click", () => camFechar(null));
+    on("camFecharX", "click", () => camFechar(null));
     on("camCapturar", "click", camCapturarFoto);
     on("camMudar", "click", camMostrarLive);
     on("camFeito", "click", () => camFechar(camFotoCapturada));

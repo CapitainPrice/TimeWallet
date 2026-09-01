@@ -59,7 +59,7 @@ users/{uid}/
 
 - Configurável (padrão 26→25), editável em `periodModal`, salvo em `localStorage`.
 - **Calendário**: trava navegação/registro a uma janela de 6 meses a partir do primeiro login (`App.getComprovanteCicloAtual`, `COMPROVANTE_PERIODO_MESES`).
-- **Banco de Horas** (cards "Comprovantes do período" e "Histórico de baixas"): usa ano civil fixo — 12 períodos, janeiro a dezembro, sempre recalculado a partir da data de hoje (sem depender de primeiro login, sem nada salvo — reseta sozinho a cada virada de ano).
+- **Banco de Horas** (cards "Histórico de registros" e "Comprovantes do período"): usa ano civil fixo — 12 períodos possíveis, janeiro a dezembro, sempre recalculado a partir da data de hoje (sem depender de primeiro login, sem nada salvo — reseta sozinho a cada virada de ano). **Só aparecem na navegação/select os períodos que já têm pelo menos 1 registro, mais o período atual** (mesmo sem registro ainda, pra não deixar a tela sem opção nenhuma); o cálculo dos 12 períodos continua existindo por trás — é só a lista visível que filtra (`getPeriodosComRegistro` em `banco-horas.js`). O saldo acumulado do topo soma o ano inteiro, então o filtro não muda o valor — só limpa a navegação.
 
 ### Baixa de saldo (Banco de Horas)
 
