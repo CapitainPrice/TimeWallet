@@ -53,11 +53,13 @@ window.FIREBASE_CONFIG = {
   apiKey: "SUA_API_KEY_AQUI",
   authDomain: "SEU_PROJETO.firebaseapp.com",
   projectId: "SEU_PROJETO",
-  storageBucket: "SEU_PROJETO.appspot.com",
+  storageBucket: "SEU_PROJETO.firebasestorage.app",
   messagingSenderId: "SEU_SENDER_ID",
   appId: "SEU_APP_ID"
 };
 ```
+
+> `storageBucket` em projetos novos do Firebase vem no formato `SEU_PROJETO.firebasestorage.app` (não mais `.appspot.com`) — copie o valor exato que o Console te der no passo 4, não confie neste placeholder.
 
 O `.gitignore` já inclui `config.js` — **nunca commite este arquivo**.
 
@@ -106,11 +108,21 @@ users/{uid}/
     extraMin: number         // minutos extra (negativo = desconto)
     comprovante: "data:image/...base64"  // foto base64
     comprovanteNome: "arquivo.jpg"
-    localizacao: {           // opcional
+    comprovantePeriodo: "periodo 08"     // rótulo do período no momento do registro
+    localizacao: {           // opcional — só existe depois da geolocalização resolver
       lat: number,
       lng: number,
-      endereco: "string"
+      address: "string"      // resolvido via reverseGeocode (Nominatim/OSM)
     }
+
+  baixas/{YYYY-MM-DD}/
+    data: "YYYY-MM-DD"
+    horario: "HH:MM"
+    saldoBaixado: number      // saldo (minutos) baixado nesse momento
+    comprovante: "data:image/...base64"   // foto da baixa
+    comprovanteNome: "arquivo.jpg"
+    recibo: "data:image/...base64"        // comprovante gerado em canvas
+    reciboNome: "arquivo.png"
 ```
 
 ---
@@ -119,11 +131,11 @@ users/{uid}/
 
 - **`index.html`** carrega `config.js` antes do script principal (linha 12)
 - `Store` abstrai dual-mode:
-  - Autenticado → Firestore (`users/{uid}/registros/{dateKey}`)
+  - Autenticado → Firestore (`users/{uid}/registros/{dateKey}` e `users/{uid}/baixas/{dateKey}`)
   - Não autenticado → `localStorage` (fallback original)
-- Todos métodos `Store` são **async** (`getAll`, `get`, `set`)
+- Todos métodos `Store` são **async** (`getAll`, `get`, `set`, `getAllBaixas`, `addBaixa`)
 - **Migração automática**: no 1º login, dados do `localStorage` vão para Firestore
-- **Offline**: Firestore persistence ativada (`enablePersistence`)
+- **Offline**: Firestore persistence ativada (`enablePersistence`) — o SDK loga um aviso de depreciação (`enableMultiTabIndexedDbPersistence` será substituído por `FirestoreSettings.cache`); não afeta o funcionamento hoje, mas é troca pendente numa atualização futura do Firebase SDK
 
 ---
 

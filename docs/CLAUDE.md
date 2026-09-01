@@ -48,7 +48,11 @@ users/{uid}/
     extraMin: number
     comprovante: "data:image/...base64"
     comprovanteNome: "arquivo.jpg"
-    localizacao: { lat, lng, endereco }
+    comprovantePeriodo: "periodo 08"
+    localizacao: { lat, lng, address }   // opcional, só depois da geolocalização resolver
+
+  baixas/{YYYY-MM-DD}/
+    data, horario, saldoBaixado, comprovante, comprovanteNome, recibo, reciboNome
 ```
 
 ### Período de pagamento
@@ -72,7 +76,7 @@ users/{uid}/
 
 1. **Splash screen** — ao abrir a raiz (`index.html`), o app mostra `views/splash.html` por 2 segundos com logo e nome da empresa, e depois redireciona de volta para a home na mesma sessão.
 2. **Tela inicial** — `div.sub-header` exibe a data completa no formato "Domingo, 30/08/2026" apenas na raiz/home. Card "Registro Saída" com botão de câmera, status visual de registro concluído sem exibir a imagem do comprovante, botão "Banco de Horas" (pílula bege com ícone de relógio).
-3. **Câmera in-app** (`getUserMedia`, não usa `<input capture>` puro porque no Android isso cai na galeria) — preview ao vivo, captura, confirmação ("Foto ficou boa?" → Mudar / Feito!), aí sim preenche horário atual, salva e captura geolocalização. Se a localização falhar por falta de HTTPS/permissão/timeout, a UI informa o motivo em vez de falhar silenciosamente.
+3. **Câmera in-app** (`getUserMedia`, não usa `<input capture>` puro porque no Android isso cai na galeria) — preview ao vivo, captura, confirmação ("Foto ficou boa?" → Mudar / Feito!), aí sim preenche horário atual, salva e captura geolocalização. O card "Localização" (`#comprovanteMeta`/`#comprovantePeriodo`, dentro do hero de resultado) é o **único** lugar que mostra status de localização — passa por "Obtendo localização..." → "Obtendo endereço..." → endereço final; em erro (permissão negada, timeout, serviço desligado), mostra a causa e um botão "Tentar novamente" que também dispara sozinho quando a aba volta a ficar visível. A localização resolvida é persistida de volta no registro (que já tinha sido salvo antes, sem esperar a geolocalização) via `salvarLocalizacaoRegistroHoje()`.
 4. **Calendário** — navegação por **período configurável** (padrão 26→25, editável via botão de engrenagem `periodSettingsBtn` que abre o `periodModal`, salvo em `localStorage`), indicadores visuais por dia: hoje (classe `today`), preenchido (`filled` + `filled-negative/neutral/positive`), pendente/sem registro (classe `pending`, borda vermelha — **só aplica pra dias passados, `key < hojeKey`; hoje sem registro nunca fica marcado como pendente, só como "hoje"**), fim de semana/feriado (`off`, cinza, não clicável). Clicar num dia útil sempre abre o detalhe/formulário de registro manual (com modal de seleção de horário); o card mostra o rótulo "Período" e o botão de engrenagem pra alterar início e fim do período. Uma trava adicional de 6 meses a partir do primeiro login (`COMPROVANTE_PERIODO_MESES`) limita quais períodos ficam navegáveis/baixáveis pro Banco de Horas.
 5. **Detalhe do dia / Registro manual** — dentro do calendário, ao clicar num dia sem registro abre o formulário de registro manual (`renderFormManual`, wrapper `.form-manual`): campo "Horário Saída" via botão que abre modal de seleção de horário (hora/minuto), campo "Comprovante" com seleção de imagem da galeria, botão "Salvar registro". Dia já registrado mostra o detalhe: horário de ponto (15:00 fixo), horário de saída, localização (link pro Google Maps + endereço resolvido por **geocodificação reversa** via Nominatim/OSM, cacheado em memória, com fallback pra lat/lng cru se a API falhar), tempo extra do dia, comprovante (miniatura + visualizar + baixar).
 6. **Banco de Horas** — saldo total do período atual, lista paginada de registros (`REG_POR_PAGINA = 6`), rótulo "Período" acima do intervalo, botão "Exportar relatório" com ícone de exportação (renderiza em Canvas) e botão "Baixar comprovantes do período" que gera um ZIP (via JSZip) com os comprovantes do período selecionado.

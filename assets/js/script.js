@@ -68,7 +68,6 @@
     const fileImg = App.byId("fileImg");
     const filePh = App.byId("filePh");
     const doneStatus = App.byId("doneStatus");
-    const geoStatus = App.byId("geoStatus");
     const tempoExtraLabel = App.byId("tempoExtraLabel");
     const tempoExtra = App.byId("tempoExtra");
     const horarioCapturado = App.byId("horarioCapturado");
@@ -81,10 +80,6 @@
     }
     if (filePh) filePh.style.display = "flex";
     if (doneStatus) doneStatus.style.display = "none";
-    if (geoStatus) {
-      geoStatus.style.display = "none";
-      geoStatus.textContent = "";
-    }
     if (tempoExtraLabel) tempoExtraLabel.textContent = "Tempo extra";
     if (tempoExtra) tempoExtra.textContent = "—";
     if (horarioCapturado) horarioCapturado.textContent = "Aguardando registro de hoje";
@@ -112,13 +107,13 @@
   let geoRetryOnFocus = null;
 
   function exibirStatusGeo(texto, { retry = false } = {}) {
-    const el = App.byId("geoStatus");
-    if (!el) return;
-    el.style.display = "flex";
-    el.innerHTML = "";
-    const span = document.createElement("span");
-    span.textContent = texto;
-    el.appendChild(span);
+    const box = App.byId("comprovanteMeta");
+    const valorEl = App.byId("comprovantePeriodo");
+    const retryBtn = App.byId("geoRetryBtn");
+    if (!box || !valorEl) return;
+    box.hidden = false;
+    valorEl.textContent = texto;
+    if (retryBtn) retryBtn.hidden = !retry;
 
     if (geoRetryOnFocus) {
       document.removeEventListener("visibilitychange", geoRetryOnFocus);
@@ -126,13 +121,6 @@
     }
 
     if (retry) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "geo-retry-btn";
-      btn.textContent = "Tentar novamente";
-      btn.addEventListener("click", () => capturarLocalizacao());
-      el.appendChild(btn);
-
       geoRetryOnFocus = () => {
         if (document.visibilityState !== "visible") return;
         document.removeEventListener("visibilitychange", geoRetryOnFocus);
@@ -153,13 +141,15 @@
   function atualizarMetaComprovante(dateKey, nomeOriginal) {
     const box = App.byId("comprovanteMeta");
     const periodoEl = App.byId("comprovantePeriodo");
+    const retryBtn = App.byId("geoRetryBtn");
     if (!box || !periodoEl) return;
+    if (retryBtn) retryBtn.hidden = true;
     if (!nomeOriginal) {
       box.hidden = true;
       periodoEl.textContent = "—";
       return;
     }
-    periodoEl.textContent = comprovanteLocalizacao ? App.getLocationDisplay(comprovanteLocalizacao) : "Não obtida";
+    periodoEl.textContent = comprovanteLocalizacao ? App.getLocationDisplay(comprovanteLocalizacao) : "Obtendo localização...";
     box.hidden = false;
   }
 
@@ -200,7 +190,6 @@
 
     if (comprovanteBase64) exibirComprovante(comprovanteBase64);
     atualizarMetaComprovante(hojeKey, comprovanteNome);
-    if (comprovanteLocalizacao) exibirStatusGeo(`Localização: ${App.getLocationDisplay(comprovanteLocalizacao)}`);
     mostrarResultado(reg.extraMin, reg.saida);
     atualizarTravaRegistroHoje(true);
   }
@@ -286,7 +275,7 @@
           exibirStatusGeo("Obtendo endereço...");
           const address = await App.reverseGeocode(lat, lng);
           comprovanteLocalizacao.address = address;
-          exibirStatusGeo(`Localização: ${address}`);
+          exibirStatusGeo(address);
           await salvarLocalizacaoRegistroHoje();
         },
         (error) => {
@@ -301,7 +290,7 @@
           }
           exibirStatusGeo("Ative a localização do dispositivo e tente novamente", { retry: true });
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
       );
     };
 
@@ -357,6 +346,7 @@
 
   App.on("btnRegistro", "click", App.goToRegistro);
   App.on("btnCamera", "click", abrirCamera);
+  App.on("geoRetryBtn", "click", () => capturarLocalizacao());
   App.on("comprovanteCamera", "change", (e) => {
     const file = e.target.files[0];
     if (file) processarArquivo(file);
