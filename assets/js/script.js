@@ -326,6 +326,11 @@
   }
 
   async function abrirCamera() {
+    await App.Store.waitAuthReady();
+    if (!App.Store.getCurrentUser()) {
+      App.mostrarToast("Faça login com Google para registrar.");
+      return;
+    }
     if (registroHojeTravado) {
       App.mostrarToast("Você já registrou sua saída hoje.");
       return;

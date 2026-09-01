@@ -36,6 +36,7 @@ Essa regra vale em todo lugar que mostra tempo extra: card da tela inicial, deta
 - **Autenticado** → Firestore em `users/{uid}/registros/{dateKey}` — sincroniza entre dispositivos, persiste offline.
 - **Não autenticado** → `localStorage` (chave `bancoHoras_registros`) — comportamento original.
 - Migração automática `localStorage → Firestore` no primeiro login.
+- **Registro diário (botão de câmera na home) exige login**: `abrirCamera()` em `script.js` bloqueia (toast "Faça login com Google para registrar.") se `Store.getCurrentUser()` for `null` — mesmo com o fallback de `localStorage` existindo tecnicamente, não dá mais pra registrar sem estar autenticado. Não afeta o registro manual do Calendário, que continua sem essa trava.
 - Firestore travado por `request.auth.uid == userId` — cada usuário só acessa os próprios dados.
 
 O objeto `Store` abstrai isso: `getAll()`, `get(key)`, `set(key, data)` — todos **async** (retornam Promise).
@@ -58,7 +59,7 @@ users/{uid}/
 ### Período de pagamento
 
 - Configurável (padrão 26→25), editável em `periodModal`, salvo em `localStorage`.
-- **Calendário**: trava navegação/registro a uma janela de 6 meses a partir do primeiro login (`App.getComprovanteCicloAtual`, `COMPROVANTE_PERIODO_MESES`).
+- **Calendário**: trava navegação/registro a uma janela de 6 **períodos de pagamento** a partir do primeiro login (`App.getComprovanteCicloAtual`, `COMPROVANTE_PERIODO_MESES`). O início do ciclo é ancorado no período de pagamento que **contém** a data do primeiro login (via `getCurrentPaymentAnchor`), não no mês calendário — login no meio de um período (ex.: dia 01/09, período configurado 26→25) já libera aquele período inteiro (26/08–25/09) desde o início, em vez de pular pro período seguinte.
 - **Banco de Horas** (cards "Histórico de registros" e "Comprovantes do período"): usa ano civil fixo — 12 períodos possíveis, janeiro a dezembro, sempre recalculado a partir da data de hoje (sem depender de primeiro login, sem nada salvo — reseta sozinho a cada virada de ano). **Só aparecem na navegação/select os períodos que já têm pelo menos 1 registro, mais o período atual** (mesmo sem registro ainda, pra não deixar a tela sem opção nenhuma); o cálculo dos 12 períodos continua existindo por trás — é só a lista visível que filtra (`getPeriodosComRegistro` em `banco-horas.js`). O saldo acumulado do topo soma o ano inteiro, então o filtro não muda o valor — só limpa a navegação.
 
 ### Baixa de saldo (Banco de Horas)

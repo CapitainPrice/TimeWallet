@@ -354,7 +354,7 @@
   }
 
   function getComprovanteCicloAtual() {
-    let inicio = startOfMonth(getComprovanteCicloBase());
+    let inicio = getCurrentPaymentAnchor(getComprovanteCicloBase());
     let fim = getPeriodBounds(addMonths(inicio, COMPROVANTE_PERIODO_MESES - 1)).end;
     const agora = new Date();
 
@@ -839,6 +839,10 @@
 
     getCurrentUser() {
       return this._user;
+    },
+
+    async waitAuthReady() {
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
     },
 
     _getCollection() {
