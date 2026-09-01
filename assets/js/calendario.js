@@ -3,6 +3,7 @@
   if (!App) return;
 
   let periodAnchor = App.getCurrentPaymentAnchor();
+  let periodosCalendario = [];
 
   function splitComprovanteResumo(resumo) {
     const match = String(resumo || "").match(/^comprovante_([^_]+)_(.+)$/);
@@ -44,12 +45,11 @@
     return App.startOfMonth(App.getComprovanteCicloAtual().start);
   }
 
-  function isDentroDoCicloAtual(anchor) {
-    const ciclo = App.getComprovanteCicloAtual();
-    const inicio = App.startOfMonth(ciclo.start);
-    const fim = App.startOfMonth(App.addMonths(ciclo.start, App.COMPROVANTE_PERIODO_MESES - 1));
-    const atual = App.startOfMonth(anchor);
-    return atual >= inicio && atual <= fim;
+  function preencherPeriodosCalendario(registros) {
+    periodosCalendario = App.getPeriodosComRegistro(new Date().getFullYear(), registros);
+    if (!periodosCalendario.some((periodo) => periodo.value === App.toKey(periodAnchor))) {
+      periodAnchor = App.getCurrentPaymentAnchor();
+    }
   }
 
   function fillPeriodSelect(selectId, selectedValue) {
@@ -95,14 +95,14 @@
     const nextBtn = App.byId("nextMonth");
     if (!monthLabel || !grid) return;
 
-    if (!isDentroDoCicloAtual(periodAnchor)) {
-      periodAnchor = getPrimeiroPeriodoPermitido();
-    }
+    const registros = await App.Store.getAll();
+    preencherPeriodosCalendario(registros);
 
     const { start, end } = App.getPeriodBounds(periodAnchor);
     monthLabel.textContent = App.getPeriodLabel(periodAnchor);
-    if (prevBtn) prevBtn.disabled = App.toKey(periodAnchor) === App.toKey(getPrimeiroPeriodoPermitido());
-    if (nextBtn) nextBtn.disabled = App.toKey(periodAnchor) === App.toKey(App.startOfMonth(App.addMonths(App.getComprovanteCicloAtual().start, App.COMPROVANTE_PERIODO_MESES - 1)));
+    const indiceAtual = periodosCalendario.findIndex((periodo) => periodo.value === App.toKey(periodAnchor));
+    if (prevBtn) prevBtn.disabled = indiceAtual <= 0;
+    if (nextBtn) nextBtn.disabled = indiceAtual < 0 || indiceAtual >= periodosCalendario.length - 1;
     grid.innerHTML = "";
 
     App.DIAS_SEMANA_ABR.forEach((dia) => {
@@ -112,7 +112,6 @@
       grid.appendChild(el);
     });
 
-    const registros = await App.Store.getAll();
     const firstDow = start.getDay();
     for (let i = 0; i < firstDow; i += 1) {
       const el = document.createElement("div");
@@ -191,7 +190,7 @@
     const dados = dadosPeriodo.map(({ key, date, reg }) => {
       const comprovanteResumo = App.getComprovanteInfo(key, reg?.comprovanteNome).resumo;
       return {
-        dia: `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
+        dia: `${App.DIAS_SEMANA[date.getDay()]}, ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
         ponto: "15:00",
         saida: reg.saida,
         localizacao: App.getLocalizacaoTexto(reg.localizacao),
@@ -475,10 +474,18 @@
         titulo: manualNome,
         periodo: "—",
       };
+      const recibo = await App.gerarComprovanteRegistro({
+        foto: manualBase64,
+        data: dataFmt,
+        horario: saida,
+        localizacao: null,
+        usuario: App.obterNomeUsuario(),
+        saldo: App.formatarSaldoTexto(extraMin),
+      });
       await App.Store.set(key, {
         saida,
         extraMin,
-        comprovante: manualBase64,
+        comprovante: recibo,
         comprovanteNome: comprovanteInfo.nome,
         comprovantePeriodo: comprovanteInfo.periodo,
         localizacao: null,
@@ -493,11 +500,16 @@
     const area = App.byId("detailArea");
     if (!area) return;
 
+    const heroIcon = App.byId("detailHeroIcon");
+    if (heroIcon) heroIcon.classList.remove("is-danger");
+
     area.innerHTML = '<div class="empty-msg">Carregando...</div>';
     mostrarViewDetalhe();
     renderCabecalhoDetalhe(date);
     const reg = await App.Store.get(key);
-    const dataFmt = `${App.DIAS_SEMANA[date.getDay()]} ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+    const dataFmt = `${App.DIAS_SEMANA[date.getDay()]}, ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
+
+    if (reg && heroIcon) heroIcon.classList.toggle("is-danger", reg.extraMin < 0);
 
     if (!reg) {
       const primeiroPeriodoPermitido = getPrimeiroPeriodoPermitido();
@@ -593,15 +605,15 @@
   }
 
   App.on("prevMonth", "click", async () => {
-    const proximo = App.shiftPaymentAnchor(periodAnchor, -1);
-    if (!isDentroDoCicloAtual(proximo)) return;
-    periodAnchor = proximo;
+    const indiceAtual = periodosCalendario.findIndex((periodo) => periodo.value === App.toKey(periodAnchor));
+    if (indiceAtual <= 0) return;
+    periodAnchor = periodosCalendario[indiceAtual - 1].anchor;
     await renderCalendario();
   });
   App.on("nextMonth", "click", async () => {
-    const proximo = App.shiftPaymentAnchor(periodAnchor, 1);
-    if (!isDentroDoCicloAtual(proximo)) return;
-    periodAnchor = proximo;
+    const indiceAtual = periodosCalendario.findIndex((periodo) => periodo.value === App.toKey(periodAnchor));
+    if (indiceAtual < 0 || indiceAtual >= periodosCalendario.length - 1) return;
+    periodAnchor = periodosCalendario[indiceAtual + 1].anchor;
     await renderCalendario();
   });
   App.on("periodSettingsBtn", "click", abrirConfiguracaoPeriodo);
@@ -622,9 +634,6 @@
   App.initShell({
     onReady: async () => {
       periodAnchor = App.getCurrentPaymentAnchor();
-      if (!isDentroDoCicloAtual(periodAnchor)) {
-        periodAnchor = getPrimeiroPeriodoPermitido();
-      }
       mostrarViewCalendario();
       renderCabecalhoCalendario();
       await renderCalendario();

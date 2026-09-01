@@ -24,6 +24,7 @@
   };
 
   let comprovanteBase64 = null;
+  let comprovanteFotoOriginal = null;
   let comprovanteNome = null;
   let comprovanteLocalizacao = null;
   let registroHojeTravado = false;
@@ -35,6 +36,11 @@
 
   function getHojeKey() {
     return App.toKey(getAgora());
+  }
+
+  function getDataFmtHoje() {
+    const agora = getAgora();
+    return `${App.DIAS_SEMANA[agora.getDay()]}, ${String(agora.getDate()).padStart(2, "0")}/${String(agora.getMonth() + 1).padStart(2, "0")}/${agora.getFullYear()}`;
   }
 
   function periodoDoDia(hora) {
@@ -91,6 +97,7 @@
     atualizarMetaComprovante(getHojeKey(), null);
 
     comprovanteBase64 = null;
+    comprovanteFotoOriginal = null;
     comprovanteNome = null;
     comprovanteLocalizacao = null;
     atualizarTravaRegistroHoje(false);
@@ -215,10 +222,19 @@
     };
     comprovanteNome = comprovanteInfo.nome;
 
+    const recibo = await App.gerarComprovanteRegistro({
+      foto: comprovanteFotoOriginal || comprovanteBase64,
+      data: getDataFmtHoje(),
+      horario: saida.value,
+      localizacao: comprovanteLocalizacao ? App.getLocationDisplay(comprovanteLocalizacao) : null,
+      usuario: App.obterNomeUsuario(),
+      saldo: App.formatarSaldoTexto(extraMin),
+    });
+
     await App.Store.set(hojeKey, {
       saida: saida.value,
       extraMin,
-      comprovante: comprovanteBase64,
+      comprovante: recibo,
       comprovanteNome,
       comprovantePeriodo: comprovanteInfo.periodo,
       localizacao: comprovanteLocalizacao,
@@ -234,7 +250,21 @@
     const hojeKey = getHojeKey();
     const registro = await App.Store.get(hojeKey);
     if (!registro) return;
-    await App.Store.set(hojeKey, { ...registro, localizacao: comprovanteLocalizacao });
+
+    if (!comprovanteFotoOriginal) {
+      await App.Store.set(hojeKey, { ...registro, localizacao: comprovanteLocalizacao });
+      return;
+    }
+
+    const recibo = await App.gerarComprovanteRegistro({
+      foto: comprovanteFotoOriginal,
+      data: getDataFmtHoje(),
+      horario: registro.saida,
+      localizacao: App.getLocationDisplay(comprovanteLocalizacao),
+      usuario: App.obterNomeUsuario(),
+      saldo: App.formatarSaldoTexto(registro.extraMin),
+    });
+    await App.Store.set(hojeKey, { ...registro, comprovante: recibo, localizacao: comprovanteLocalizacao });
   }
 
   function processarArquivo(file) {
@@ -246,6 +276,7 @@
     const reader = new FileReader();
     reader.onload = async () => {
       comprovanteBase64 = reader.result;
+      comprovanteFotoOriginal = comprovanteBase64;
       exibirComprovante(comprovanteBase64);
       preencherHorarioAtual();
       const salvou = await salvarRegistroHoje();
@@ -344,6 +375,7 @@
 
     comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(getHojeKey(), "foto.jpg") : `foto_${Date.now()}.jpg`;
     comprovanteBase64 = resultado;
+    comprovanteFotoOriginal = comprovanteBase64;
     exibirComprovante(comprovanteBase64);
     preencherHorarioAtual();
     const salvou = await salvarRegistroHoje();

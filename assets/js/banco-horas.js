@@ -45,39 +45,6 @@
     return `${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`;
   }
 
-  function getSemestralLabel(start, end) {
-    return `${String(start.getDate()).padStart(2, "0")}/${String(start.getMonth() + 1).padStart(2, "0")}/${start.getFullYear()} – ${String(end.getDate()).padStart(2, "0")}/${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
-  }
-
-  function getPeriodosDoAno(ano) {
-    const periodos = [];
-    for (let mes = 0; mes < 12; mes += 1) {
-      const anchor = new Date(ano, mes, 1);
-      const bounds = App.getPeriodBounds(anchor);
-      periodos.push({
-        value: App.toKey(anchor),
-        anchor,
-        start: bounds.start,
-        end: bounds.end,
-        label: getSemestralLabel(bounds.start, bounds.end),
-      });
-    }
-    return periodos;
-  }
-
-  function periodoTemRegistro(periodo, registros) {
-    for (let d = new Date(periodo.start); d <= periodo.end; d.setDate(d.getDate() + 1)) {
-      if (registros[App.toKey(d)]) return true;
-    }
-    return false;
-  }
-
-  function getPeriodosComRegistro(ano, registros) {
-    const todos = getPeriodosDoAno(ano);
-    const periodoAtualKey = App.toKey(App.getCurrentPaymentAnchor(new Date()));
-    return todos.filter((periodo) => periodo.value === periodoAtualKey || periodoTemRegistro(periodo, registros));
-  }
-
   function preencherPeriodosComprovante(registros) {
     const select = App.byId("comprovantePeriodoSelect");
     if (!select) return;
@@ -85,7 +52,7 @@
     const valorAtual = select.value;
     const periodoAtual = App.getCurrentPaymentAnchor(new Date());
     const periodoAtualKey = App.toKey(periodoAtual);
-    comprovantePeriodos = getPeriodosComRegistro(new Date().getFullYear(), registros);
+    comprovantePeriodos = App.getPeriodosComRegistro(new Date().getFullYear(), registros);
 
     select.innerHTML = comprovantePeriodos.map((periodo) => `<option value="${periodo.value}">${periodo.label}</option>`).join("");
     select.disabled = false;

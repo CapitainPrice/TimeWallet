@@ -11,6 +11,7 @@
   const DEFAULT_PERIOD_CONFIG = Object.freeze({ startDay: 26, endDay: 25 });
   const COMPROVANTE_PERIODO_MESES = 6;
   const COMPROVANTE_CICLO_KEY_PREFIX = "bancoHoras_comprovantes_primeiro_login";
+  const LIMPEZA_ANO_KEY_PREFIX = "bancoHoras_limpeza_ano";
 
   const DIAS_SEMANA = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
   const DIAS_SEMANA_ABR = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -87,6 +88,39 @@
   function getPeriodLabel(anchor) {
     const { start, end } = getPeriodBounds(anchor);
     return `${fmtCurta(start)} – ${fmtCurta(end)}/${end.getFullYear()}`;
+  }
+
+  function getSemestralLabel(start, end) {
+    return `${String(start.getDate()).padStart(2, "0")}/${String(start.getMonth() + 1).padStart(2, "0")}/${start.getFullYear()} – ${String(end.getDate()).padStart(2, "0")}/${String(end.getMonth() + 1).padStart(2, "0")}/${end.getFullYear()}`;
+  }
+
+  function getPeriodosDoAno(ano) {
+    const periodos = [];
+    for (let mes = 0; mes < 12; mes += 1) {
+      const anchor = new Date(ano, mes, 1);
+      const bounds = getPeriodBounds(anchor);
+      periodos.push({
+        value: toKey(anchor),
+        anchor,
+        start: bounds.start,
+        end: bounds.end,
+        label: getSemestralLabel(bounds.start, bounds.end),
+      });
+    }
+    return periodos;
+  }
+
+  function periodoTemRegistro(periodo, registros) {
+    for (let d = new Date(periodo.start); d <= periodo.end; d.setDate(d.getDate() + 1)) {
+      if (registros[toKey(d)]) return true;
+    }
+    return false;
+  }
+
+  function getPeriodosComRegistro(ano, registros) {
+    const todos = getPeriodosDoAno(ano);
+    const periodoAtualKey = toKey(getCurrentPaymentAnchor(new Date()));
+    return todos.filter((periodo) => periodo.value === periodoAtualKey || periodoTemRegistro(periodo, registros));
   }
 
   function renderDataPrincipal() {
@@ -223,6 +257,11 @@
     return `${sinal}${h}h${String(m).padStart(2, "0")}min`;
   }
 
+  function formatarSaldoTexto(extraMin) {
+    const texto = formatarExtra(extraMin);
+    return extraMin > 0 ? `+${texto}` : texto;
+  }
+
   function clampPeriodDay(year, month, day) {
     return Math.min(day, new Date(year, month + 1, 0).getDate());
   }
@@ -254,8 +293,9 @@
   }
 
   function getPeriodoNome(anchor = getCurrentPaymentAnchor()) {
-    const { start } = getPeriodBounds(anchor);
-    return `periodo ${String(start.getMonth() + 1).padStart(2, "0")}`;
+    const { start, end } = getPeriodBounds(anchor);
+    const fmt = (d) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+    return `${fmt(start)} – ${fmt(end)}`;
   }
 
   function resolveComprovanteData(dateOrKey) {
@@ -273,11 +313,21 @@
     return String(texto || "").trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_");
   }
 
+  function getPeriodoOrdemDia(dateOrKey) {
+    const data = resolveComprovanteData(dateOrKey);
+    const anchor = resolveComprovanteAnchor(data);
+    const { start } = getPeriodBounds(anchor);
+    const dias = Math.round((data - start) / 86400000) + 1;
+    return String(Math.max(1, dias)).padStart(2, "0");
+  }
+
   function getComprovanteNomePadrao(dateOrKey, ext = "jpg") {
     const extensao = String(ext || "jpg").replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
-    const dataArquivo = formatarDataArquivo(resolveComprovanteData(dateOrKey));
+    const data = resolveComprovanteData(dateOrKey);
+    const ordem = getPeriodoOrdemDia(data);
+    const dataArquivo = formatarDataArquivo(data);
     const usuario = sanitizarNomeArquivo(obterNomeUsuario()) || "usuario";
-    return `comprovante_${dataArquivo}_${usuario}.${extensao}`;
+    return `comprovante_${ordem}_${dataArquivo}_${usuario}.${extensao}`;
   }
 
   function normalizarNomeComprovante(dateOrKey, nomeOriginal) {
@@ -521,6 +571,166 @@
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     mostrarToast("Imagem salva!");
+  }
+
+  function drawInfoCell(ctx, x, y, width, height, label, value, nota) {
+    if (label) {
+      ctx.fillStyle = "#7A8570";
+      ctx.font = "700 11px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(label.toUpperCase(), x + 20, y + 20);
+
+      ctx.strokeStyle = "#C9D1BC";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x + 20, y + 27);
+      ctx.lineTo(x + width - 20, y + 27);
+      ctx.stroke();
+    }
+
+    ctx.font = "700 17px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = "#20291A";
+    ctx.textAlign = "left";
+    const linhasValor = wrapText(ctx, value, width - 40, 2);
+    let vy = y + 52;
+    linhasValor.forEach((linhaTexto) => {
+      ctx.fillText(linhaTexto, x + 20, vy);
+      vy += 21;
+    });
+
+    if (nota) {
+      ctx.fillStyle = "#000000";
+      ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(nota, x + 20, vy + 8);
+    }
+  }
+
+  function drawInfoRow(ctx, padding, totalW, y, rowH, celulas) {
+    const colW = (totalW - padding * 2) / celulas.length;
+    celulas.forEach((celula, index) => {
+      drawInfoCell(ctx, padding + colW * index, y, colW, rowH, celula.label, celula.value, celula.nota);
+      if (index > 0) {
+        ctx.strokeStyle = "#B9C2AC";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(padding + colW * index, y + 8);
+        ctx.lineTo(padding + colW * index, y + rowH - 8);
+        ctx.stroke();
+      }
+    });
+  }
+
+  async function gerarComprovanteRegistro({ foto, data, horario, localizacao, usuario, saldo }) {
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = foto;
+    });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const totalW = 640;
+    const padding = 32;
+
+    const logoPath = `${ROOT}/assets/timewallet_logo_header_black.svg`;
+    const logoH = await drawLogoImage(ctx, totalW, padding, logoPath, 260);
+    const titleTop = padding + logoH + 14;
+
+    const maxPhotoW = totalW - padding * 2;
+    const maxPhotoH = 460;
+    const ratio = img.naturalWidth / img.naturalHeight || 1;
+    let photoW = maxPhotoW;
+    let photoH = photoW / ratio;
+    if (photoH > maxPhotoH) {
+      photoH = maxPhotoH;
+      photoW = photoH * ratio;
+    }
+    const photoTop = titleTop + 40;
+    const photoX = padding + (maxPhotoW - photoW) / 2;
+
+    const usuarioRowH = 58;
+    const linhas = [
+      [
+        { label: "Horário do ponto", value: "15:00" },
+        { label: "Horário de saída", value: horario },
+        { label: "Saldo", value: saldo, nota: "*Tolerância até 15:10" },
+      ],
+      [{ label: "Localização", value: localizacao || "Não registrada" }],
+    ];
+    const rowH = 96;
+    const tableTop = photoTop + photoH + 16;
+    const tableH = usuarioRowH + linhas.length * rowH;
+    const totalH = tableTop + tableH + padding + 34;
+
+    canvas.width = totalW * dpr;
+    canvas.height = totalH * dpr;
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = "#F7F5EE";
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    if (logoH) await drawLogoImage(ctx, totalW, padding, logoPath, 260);
+
+    ctx.fillStyle = "#20291A";
+    ctx.font = '700 24px Georgia, "Times New Roman", serif';
+    ctx.textAlign = "center";
+    ctx.fillText("Comprovante de Registro", totalW / 2, titleTop + 6);
+
+    drawRoundedRect(ctx, padding, photoTop - 10, maxPhotoW, photoH + 20, 24, "#FFFFFF", "#E6EBDB");
+    ctx.save();
+    drawRoundedRect(ctx, photoX, photoTop, photoW, photoH, 16, null, null);
+    ctx.clip();
+    ctx.drawImage(img, photoX, photoTop, photoW, photoH);
+    ctx.restore();
+
+    ctx.save();
+    drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, tableH, 24, "#FFFFFF", null);
+    ctx.clip();
+    ctx.fillStyle = "#5F674F";
+    ctx.fillRect(padding, tableTop, totalW - padding * 2, usuarioRowH);
+    ctx.restore();
+    drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, tableH, 24, null, "#AEB7A0");
+
+    const dataBaseline = tableTop + usuarioRowH / 2 + 6;
+    const virgulaIdx = String(data || "").indexOf(",");
+    const diaSemana = virgulaIdx >= 0 ? data.slice(0, virgulaIdx + 1) : data;
+    const restoData = virgulaIdx >= 0 ? data.slice(virgulaIdx + 1) : "";
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.textAlign = "left";
+    ctx.font = "700 21px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(diaSemana, padding + 20, dataBaseline);
+    if (restoData) {
+      const larguraDia = ctx.measureText(diaSemana).width;
+      ctx.font = "700 16px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.fillText(restoData, padding + 20 + larguraDia, dataBaseline);
+    }
+
+    ctx.font = "700 18px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(usuario || "—", totalW - padding - 20, dataBaseline);
+
+    let y = tableTop + usuarioRowH;
+    linhas.forEach((celulas) => {
+      ctx.strokeStyle = "#C2CAB6";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(padding + 1, y);
+      ctx.lineTo(totalW - padding - 1, y);
+      ctx.stroke();
+
+      drawInfoRow(ctx, padding, totalW, y, rowH, celulas);
+      y += rowH;
+    });
+
+    ctx.fillStyle = "#000000";
+    ctx.font = "700 12px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, totalH - padding + 6);
+
+    return canvas.toDataURL("image/png");
   }
 
   function obterNomeUsuario() {
@@ -954,7 +1164,67 @@
       all[dateKey] = data;
       localStorage.setItem(BAIXAS_STORAGE_KEY, JSON.stringify(all));
     },
+
+    async removeMany(keys) {
+      if (!keys.length) return;
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getCollection();
+      if (col) {
+        for (let i = 0; i < keys.length; i += 450) {
+          const lote = keys.slice(i, i + 450);
+          const batch = firebaseDb.batch();
+          lote.forEach((key) => batch.delete(col.doc(key)));
+          await batch.commit();
+        }
+        return;
+      }
+      const all = this.getAllSync();
+      keys.forEach((key) => delete all[key]);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    },
+
+    async removeBaixasMany(keys) {
+      if (!keys.length) return;
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getBaixasCollection();
+      if (col) {
+        for (let i = 0; i < keys.length; i += 450) {
+          const lote = keys.slice(i, i + 450);
+          const batch = firebaseDb.batch();
+          lote.forEach((key) => batch.delete(col.doc(key)));
+          await batch.commit();
+        }
+        return;
+      }
+      const all = this.getAllBaixasSync();
+      keys.forEach((key) => delete all[key]);
+      localStorage.setItem(BAIXAS_STORAGE_KEY, JSON.stringify(all));
+    },
   };
+
+  function getLimpezaAnoKey() {
+    const uid = Store.getCurrentUser()?.uid || "local";
+    return `${LIMPEZA_ANO_KEY_PREFIX}_${uid}`;
+  }
+
+  async function limparDadosAnoAnteriorSeNecessario() {
+    const agora = new Date();
+    const anoAtual = agora.getFullYear();
+    const gatilho = new Date(anoAtual, 0, 8);
+    if (agora < gatilho) return;
+
+    const chaveConfig = getLimpezaAnoKey();
+    const ultimoAnoLimpo = Number(localStorage.getItem(chaveConfig) || 0);
+    if (ultimoAnoLimpo >= anoAtual) return;
+
+    const anoAnterior = anoAtual - 1;
+    const [registros, baixas] = await Promise.all([Store.getAll(), Store.getAllBaixas()]);
+    const chavesRegistros = Object.keys(registros).filter((key) => key.startsWith(`${anoAnterior}-`));
+    const chavesBaixas = Object.keys(baixas).filter((key) => key.startsWith(`${anoAnterior}-`));
+
+    await Promise.all([Store.removeMany(chavesRegistros), Store.removeBaixasMany(chavesBaixas)]);
+    localStorage.setItem(chaveConfig, String(anoAtual));
+  }
 
   async function initShell({ onReady, onAuthChange } = {}) {
     maybeShowSplash();
@@ -965,6 +1235,7 @@
     initCameraModal();
 
     await Store.init();
+    await limparDadosAnoAnteriorSeNecessario();
 
     let firstAuthEvent = true;
     Store.onAuthStateChanged(async (user) => {
@@ -1001,6 +1272,7 @@
     mostrarToast,
     calcularExtra,
     formatarExtra,
+    formatarSaldoTexto,
     getPeriodBounds,
     getCurrentPaymentAnchor,
     obterNomeUsuario,
@@ -1013,6 +1285,10 @@
     setPeriodConfig,
     getPeriodDayOptions,
     getPeriodLabel,
+    getSemestralLabel,
+    getPeriodosDoAno,
+    periodoTemRegistro,
+    getPeriodosComRegistro,
     shiftPaymentAnchor,
     abrirImagem,
     abrirCameraModal,
@@ -1034,6 +1310,7 @@
     drawCellLines,
     drawLogoImage,
     baixarImagemRelatorio,
+    gerarComprovanteRegistro,
     goToHome,
     goToCalendario,
     goToRegistro,

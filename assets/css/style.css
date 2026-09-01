@@ -148,6 +148,7 @@ body[data-view="home"] .hero-greeting{margin:20px 0 10px;}
 .hero-wrap > .hero-greeting{align-items:flex-start;}
 .hero-icon{flex-shrink:0;}
 .hero-icon svg{width:26px;height:26px;stroke:var(--primary);}
+.hero-icon.is-danger svg{stroke:var(--danger);}
 .hero-title{
   font-family:Georgia,"Times New Roman",Cambria,serif;
   font-size:23px;
