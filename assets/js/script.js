@@ -212,6 +212,14 @@
     return true;
   }
 
+  async function salvarLocalizacaoRegistroHoje() {
+    if (!comprovanteLocalizacao) return;
+    const hojeKey = getHojeKey();
+    const registro = await App.Store.get(hojeKey);
+    if (!registro) return;
+    await App.Store.set(hojeKey, { ...registro, localizacao: comprovanteLocalizacao });
+  }
+
   function processarArquivo(file) {
     if (registroHojeTravado) {
       App.mostrarToast("Você já registrou sua saída hoje.");
@@ -251,6 +259,7 @@
         const address = await App.reverseGeocode(lat, lng);
         comprovanteLocalizacao.address = address;
         exibirStatusGeo(`Localização: ${address}`);
+        await salvarLocalizacaoRegistroHoje();
       },
       (error) => {
         comprovanteLocalizacao = null;

@@ -6,6 +6,30 @@ App pessoal para controle de banco de horas com foco mobile. O usuário registra
 
 **🌐 https://capitainprice.github.io/TimeWallet/**
 
+## Funcionamento e regras de negócio
+
+Tudo sobre como o app calcula e se comporta, num lugar só.
+
+- **Ponto fixo**: entrada sempre às **15:00**; o usuário só registra o horário de **saída**.
+- **Cálculo do tempo extra**:
+  - Saída antes das **15:00** → gera **desconto**.
+  - Saída entre **15:00 e 15:10** (tolerância) → **neutro**, saldo zero.
+  - Saída a partir das **15:11** → gera **tempo extra**, descontando a tolerância.
+  - Regra vale em todo lugar que mostra tempo extra: home, detalhe do dia e saldo do Banco de Horas.
+- **Dias úteis**: sábados, domingos e feriados nacionais brasileiros (fixos + móveis, calculados via algoritmo de Páscoa) não são clicáveis e não contam como pendência.
+- **Ciclo de períodos**: a lógica de períodos usa a configuração definida no app (padrão `26 → 25`), não o mês calendário fixo. O app cria um ciclo de **6 períodos** a partir do **primeiro login** do usuário. Exemplo com período `26 → 25`:
+  - `26/08/2026 – 25/09/2026`
+  - `26/09/2026 – 25/10/2026`
+  - `26/10/2026 – 25/11/2026`
+  - `26/11/2026 – 25/12/2026`
+  - `26/12/2026 – 25/01/2027`
+  - `26/01/2027 – 25/02/2027`
+
+  Quando o ciclo termina, o app avança automaticamente para os próximos 6 períodos. O Calendário fica limitado a esse ciclo (mais uma trava de 6 meses desde o primeiro login para navegação/download de comprovantes); o Banco de Horas usa ano civil fixo (janeiro a dezembro) para os cards de comprovantes e histórico de baixas.
+- **Baixa de saldo** (Banco de Horas): tira foto, confirma, salva data/horário/saldo baixado/foto e gera comprovante em imagem. A partir da baixa, o saldo acumulado do ano zera e volta a somar só registros posteriores — nada é apagado, só para de contar.
+- **Persistência**: **autenticado** → salva no Firestore; **não autenticado** → salva em `localStorage`. No primeiro login, os dados locais migram automaticamente para o Firestore.
+- **Registro único por dia**: só permite 1 registro por dia na home, destravando automaticamente após a meia-noite.
+
 ## Funcionalidades atuais
 
 - **Registro diário único na home** — só permite 1 registro por dia e destrava automaticamente após a meia-noite
@@ -22,29 +46,7 @@ App pessoal para controle de banco de horas com foco mobile. O usuário registra
 - **Fallback em `localStorage`** quando não houver autenticação
 - **Geocodificação reversa** (Nominatim/OSM) resolve endereço a partir de lat/lng, com cache em memória
 - **Splash screen**, navegação mobile e exportação de relatório em imagem
-
-## Regras principais do app
-
-- O ponto base continua sendo **15:00**
-- Existe tolerância até **15:10** para saldo neutro
-- Saída antes das **15:00** gera desconto
-- Saída após **15:10** gera tempo extra
-- A lógica de períodos usa a configuração definida no app, não mês calendário fixo
-
-## Ciclo de 6 períodos
-
-O app cria um ciclo de **6 períodos** a partir do **primeiro login** do usuário.
-
-Exemplo com período configurado de `26` até `25`:
-
-- `26/08/2026 – 25/09/2026`
-- `26/09/2026 – 25/10/2026`
-- `26/10/2026 – 25/11/2026`
-- `26/11/2026 – 25/12/2026`
-- `26/12/2026 – 25/01/2027`
-- `26/01/2027 – 25/02/2027`
-
-Quando o ciclo termina, o app avança automaticamente para os próximos 6 períodos.
+- **Identidade visual**: header verde-acinzentado escuro (`#5F674F`), tela de registro manual com botões de destaque (`#7B846D`) e fundos neutros (`#F0F0F0`) no lugar do verde-claro padrão, menu do usuário com item "Sair" centralizado
 
 ## Tecnologias
 
@@ -56,15 +58,6 @@ Quando o ciclo termina, o app avança automaticamente para os próximos 6 perío
 - Canvas API
 - JSZip
 - GitHub Pages + GitHub Actions
-
-## Persistência
-
-O app trabalha em dois modos:
-
-- **Autenticado**: salva em `Firestore`
-- **Não autenticado**: salva em `localStorage`
-
-No primeiro login, os dados locais podem ser usados junto com a experiência autenticada do usuário.
 
 ## Deploy
 

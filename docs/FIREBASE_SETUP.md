@@ -71,12 +71,14 @@ No console **Firestore → Rules**, substitua **tudo** por:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/registros/{docId} {
+    match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
 ```
+
+> A regra usa `{document=**}` (recursiva) porque o app grava em **duas** subcoleções por usuário — `registros` e `baixas`. Uma regra que trave só `registros/{docId}` deixa `baixas` sem regra alguma, e toda leitura de `baixas` (usada pelo Banco de Horas) cai em **negado por padrão**, com erro `Missing or insufficient permissions` — quebrando a tela inteira mesmo com login correto.
 
 → **Publish**
 
