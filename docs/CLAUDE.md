@@ -18,11 +18,15 @@ Tudo sobre como o app se comporta e calcula está aqui, num lugar só.
 
 Ponto de referência fixo: **15:00**.
 
-- Saída **antes das 15:00** → desconta. `extra = saída − 15:00` (negativo). Card fica **vermelho**.
-- Saída entre **15:00 e 15:10** (tolerância) → **neutro**, não conta nada (`extra = 0`). Card fica **verde-oliva acinzentado** (`hero-muted`, `#7B846D` com texto branco).
-- Saída **a partir das 15:11** → soma tempo extra, descontando a tolerância. `extra = saída − 15:10`. Card fica **verde**.
+- Saída **antes das 15:00** → desconta. `extra = saída − 15:00` (negativo).
+- Saída entre **15:00 e 15:10** (tolerância) → **neutro**, não conta nada (`extra = 0`).
+- Saída **a partir das 15:11** → soma tempo extra, descontando a tolerância. `extra = saída − 15:10`.
 
-Essa regra vale em todo lugar que mostra tempo extra: card da tela inicial, detalhe do dia no calendário e saldo total na tela "Banco de Horas" (aplicado ao saldo somado do período — se o total der exatamente 0, também fica cinza).
+Essa regra vale em todo lugar que mostra tempo extra: card da tela inicial, detalhe do dia no calendário e saldo total na tela "Banco de Horas" (aplicado ao saldo somado do período).
+
+**Cor do card grande de resultado (home, "Registro salvo" no Calendário, saldo do Banco de Horas)**: fica sempre cinza-oliva (`hero-muted`, `#AEB49E` com texto branco), **independente do sinal** — uma tentativa de deixar verde/vermelho por sinal foi feita e revertida a pedido do usuário (commit `d2577f7`), não reintroduzir sem confirmar antes.
+
+**Ícone/badge do card "Registro salvo" no Calendário** (diferente do card grande acima) — esse sim reage ao sinal: `.detail-card-badge` e `#detailHeroIcon` (título "Registro") ficam vermelhos (`.is-danger`) no desconto e verdes (`.is-success`) no tempo extra; neutro fica no cinza padrão. Lógica em `mostrarDetalhe()` (`calendario.js`), classes em `style.css`.
 
 ### Dias úteis / feriados
 
@@ -108,7 +112,7 @@ users/{uid}/
   - Georgia (serifada) **só** em títulos: saudação da home, títulos de tela (`hero-title`), títulos de card (`reg-export-title`, `detail-card-title`), sub-títulos de seção (`period-label-centered` — "Período", `legend-title` — "Legenda"), títulos de modal (`period-sheet-title`), nome da empresa na splash.
   - Sistema sans-serif (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif`) em todo o resto: labels, botões, inputs e **selects** — inclusive o `<select>` nativo, que por padrão herdaria a fonte do navegador em vez da do app (por isso `button,input,select{font:inherit;}` no CSS).
   - Nas telas internas, os títulos principais "Calendário" e "Banco de Horas" usam tamanho levemente ampliado, com espaçamento entre letras mais fechado, e a linha da data logo abaixo também aparece maior que no header da home — dá o tom "gerado por IA/personalizado" que o projeto buscou.
-- **Linguagem visual**: cards brancos arredondados com sombra suave (`--radius:16px`), botões em pílula, ícones SVG inline (sem emoji), hero cards de destaque (fundo verde sólido = positivo, vermelho = negativo, cinza claro `hero-muted` = neutro/zero/placeholder).
+- **Linguagem visual**: cards brancos arredondados com sombra suave (`--radius:16px`), botões em pílula, ícones SVG inline (sem emoji), hero cards de destaque em cinza-oliva `hero-muted` (`#AEB49E`) — ver nota sobre cor do card de resultado x cor do badge/ícone em "Cálculo do tempo extra".
 - **Layout**: mobile-first, largura máxima 480px centralizada, header verde-acinzentado (`.top-bar`, `#5F674F`) fixo no topo (logo alinhada mais à esquerda, acompanhando o mesmo eixo inicial dos títulos e datas das telas internas), sombra lateral esquerda intencional (`box-shadow:-4px 0 20px rgba(0,0,0,.2)`) tanto no `.app` quanto no rodapé fixo, pra dar uma "borda" de profundidade consistente em toda a tela. O footer fica quase colado ao conteúdo acima em todas as telas, e a área principal não força mais um espaço elástico grande antes dele.
 - **Tela de registro manual** (`.form-manual`, escopo pra não afetar o resto do app): os elementos que herdariam o verde-claro padrão (`--primary-light` / `#E8F0DD`) — ícone do label (`.label-ico`) e botão "Abrir galeria" (`.fa-btn`) — usam cinza neutro `#F0F0F0` em vez disso. O botão "Salvar registro" (`.btn` dentro de `.form-manual`) e o botão "Salvar horário" do modal de seleção de horário (`.period-save-btn`, usado a partir dessa tela) usam `#7B846D` (ativo `#5F674F`) em vez do verde padrão do `.btn` global — **cuidado com ordem no CSS**: regras com a mesma especificidade (`.form-manual .btn` vs `.btn`, `.period-save-btn` vs `.btn`) precisam vir **depois** da definição base de `.btn` no arquivo, senão a cascata deixa o verde padrão vencer mesmo a regra mais específica em intenção.
 
