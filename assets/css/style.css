@@ -538,7 +538,6 @@ a.da-btn{background:#7B846D;color:#fff;}
   .cal-nav button{width:32px;height:32px;}
   .period-label-centered{font-size:15px;}
   .period-select-grid{grid-template-columns:1fr;}
-  .period-sheet-actions{flex-direction:column;}
   .cal-grid{gap:3px;}
   .cal-grid .wd{font-size:10px;}
   .cal-cell{font-size:12px;}
