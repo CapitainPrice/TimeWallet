@@ -541,7 +541,7 @@
     area.innerHTML = `
       <div class="detail-card detail-card-rich">
         <div class="detail-card-top">
-          <div class="detail-card-badge ${reg.extraMin < 0 ? "is-danger" : ""}">
+          <div class="detail-card-badge ${reg.extraMin < 0 ? "is-danger" : reg.extraMin > 0 ? "is-success" : ""}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"></path><path d="M21 12c0 4.97-4.03 9-9 9S3 16.97 3 12 7.03 3 12 3c1.66 0 3.22.45 4.56 1.24"></path><path d="M16 3h5v5"></path></svg>
           </div>
           <div>

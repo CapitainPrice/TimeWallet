@@ -379,8 +379,10 @@ body.modal-open{overflow:hidden;}
 .detail-card-top{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
 .detail-card-badge{width:44px;height:44px;border-radius:16px;background:#F0F0F0;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 22px rgba(74,112,28,.12);flex-shrink:0;}
 .detail-card-badge.is-danger{background:linear-gradient(135deg,#f8e2df,#f2c5be);box-shadow:0 10px 22px rgba(179,38,30,.14);}
+.detail-card-badge.is-success{background:linear-gradient(135deg,#e3f0d7,#c9dfb0);box-shadow:0 10px 22px rgba(74,112,28,.16);}
 .detail-card-badge svg{width:20px;height:20px;stroke:var(--primary-dark);}
 .detail-card-badge.is-danger svg{stroke:var(--danger);}
+.detail-card-badge.is-success svg{stroke:var(--primary);}
 .detail-card-title{font-family:Georgia,"Times New Roman",Cambria,serif;font-size:22px;color:var(--text);}
 .detail-card-subtitle{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.35;}
 .detail-day{display:flex;align-items:baseline;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
