@@ -18,9 +18,10 @@ Tudo sobre como o app se comporta e calcula está aqui, num lugar só.
 
 Ponto de referência fixo: **15:00**.
 
-- Saída **antes das 15:00** → desconta. `extra = saída − 15:00` (negativo). Card fica **vermelho**.
-- Saída entre **15:00 e 15:10** (tolerância) → **neutro**, não conta nada (`extra = 0`). Card fica **verde-oliva acinzentado** (`hero-muted`, `#7B846D` com texto branco).
-- Saída **a partir das 15:11** → soma tempo extra, descontando a tolerância. `extra = saída − 15:10`. Card fica **verde**.
+- Saída **antes das 15:00** → desconta. `extra = saída − 15:00` (negativo). Card fica **vermelho** (`#B3261E`).
+- Saída entre **15:00 e 15:10** (tolerância) → **neutro**, não conta nada (`extra = 0`). Card fica **cinza-oliva** (`hero-muted`, `#AEB49E` com texto branco).
+- Saída **a partir das 15:11** → soma tempo extra, descontando a tolerância. `extra = saída − 15:10`. Card fica **verde** (`#4A701C`).
+- Regra de cor vale nos três lugares que mostram o hero de resultado: card da home (`mostrarResultado` em `script.js`), card "Registro salvo" no Calendário (`mostrarDetalhe` em `calendario.js`) e card de saldo do Banco de Horas (`atualizarResumoTela` em `banco-horas.js`) — todos calculam a cor a partir do sinal, não usam mais um cinza-oliva fixo pra tudo.
 
 Essa regra vale em todo lugar que mostra tempo extra: card da tela inicial, detalhe do dia no calendário e saldo total na tela "Banco de Horas" (aplicado ao saldo somado do período — se o total der exatamente 0, também fica cinza).
 

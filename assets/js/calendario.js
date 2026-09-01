@@ -535,7 +535,8 @@
     const nome = comprovanteInfo.nome;
     const statusLabel = reg.extraMin < 0 ? "Desconto" : reg.extraMin === 0 ? "Neutro" : "Tempo extra";
     const heroClass = "detail-hero";
-    const heroBg = "background:#AEB49E;color:#fff;";
+    const heroCor = reg.extraMin < 0 ? "#B3261E" : reg.extraMin === 0 ? "#AEB49E" : "#4A701C";
+    const heroBg = `background:${heroCor};color:#fff;`;
     const localizacaoHtml = reg.localizacao ? App.getLocationMapLink(reg.localizacao) : "Não registrada";
 
     area.innerHTML = `

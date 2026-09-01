@@ -375,7 +375,7 @@
 
     if (hero) {
       hero.classList.toggle("hero-muted", resumo.saldo === 0);
-      hero.style.background = "#AEB49E";
+      hero.style.background = resumo.saldo < 0 ? "#B3261E" : resumo.saldo === 0 ? "#AEB49E" : "#4A701C";
     }
     if (saldoEl) {
       saldoEl.textContent = App.formatarExtra(resumo.saldo);
