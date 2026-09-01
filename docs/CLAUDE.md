@@ -8,7 +8,7 @@ App pessoal para controle de banco de horas de estágio. O usuário bate ponto d
 
 App está organizado sem build e sem framework, com HTML + CSS + JS puro abrindo direto no navegador (double-click ou `file://`). A entrada principal continua sendo o `index.html` na raiz, com estilos compartilhados em `assets/css/style.css`, módulo compartilhado em `assets/js/shared.js` (`Store`, `calcularExtra`, `isDiaUtil`, `initShell`, geocoding, config de período etc.), scripts próprios de cada tela (`assets/js/script.js` pra home, `assets/js/calendario.js` e `assets/js/banco-horas.js`) e telas separadas em `views/` (`calendario.html`, `banco-horas.html`, `splash.html`). `views/base.html` existe no repo como template `{{content}}`/`{{root}}` mas não é referenciado por nenhuma tela atual — código morto/experimento, não usar como referência de estrutura.
 
-> **Registro de mudanças**: sempre que qualquer arquivo do projeto for alterado, registre a mudança em `logs/versions/` com um `.md` novo no topo contendo data, arquivos afetados e campos/itens modificados. Patch notes gerais ficam em `logs/patchNotes/`. Ao alterar comportamento, mantenha `docs/CLAUDE.md` e `docs/README.md` alinhados com esse histórico.
+> **Registro de mudanças**: sempre que qualquer arquivo do projeto for alterado, registre a mudança em `logs/versions/` com um `.md` novo contendo data, arquivos afetados e campos/itens modificados. Ao alterar comportamento, mantenha `docs/CLAUDE.md` e `docs/README.md` alinhados com esse histórico.
 
 ## Funcionamento e regras de negócio
 
