@@ -817,18 +817,13 @@
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(video, 0, 0);
-    camFotoCapturada = canvas.toDataURL("image/jpeg", 0.85);
-
     ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
     ctx.clearRect(-canvas.width, 0, canvas.width, canvas.height);
     ctx.drawImage(video, 0, 0);
-    const fotoPreview = canvas.toDataURL("image/jpeg", 0.85);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    camFotoCapturada = canvas.toDataURL("image/jpeg", 0.85);
 
-    preview.src = fotoPreview;
+    preview.src = camFotoCapturada;
     byId("camVideo")?.style.setProperty("display", "none");
     preview.style.display = "block";
     byId("camQuestion")?.style.setProperty("display", "block");
