@@ -447,8 +447,16 @@ a.da-btn{background:#7B846D;color:#fff;}
 .splash-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px 24px 96px;background:radial-gradient(circle at top,#eef4e3 0%,#f7f5ee 52%,#f7f5ee 100%);text-align:center;}
 .splash-logo{width:min(390px,92vw);height:auto;display:block;filter:drop-shadow(0 14px 30px rgba(55,82,21,.16));}
 .splash-company{font-family:Georgia,"Times New Roman",Cambria,serif;font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--primary-dark);}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--primary-dark);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:200;white-space:nowrap;}
-.toast.show{opacity:1;}
+.toast{position:fixed;bottom:24px;left:50%;width:min(calc(100% - 32px),440px);transform:translate(-50%,12px);background:#fff;color:var(--text);padding:13px 18px 13px 48px;border:1px solid rgba(74,112,28,.14);border-left:4px solid var(--primary);border-radius:14px;box-shadow:0 12px 30px rgba(32,41,26,.18);font-size:14px;font-weight:600;line-height:1.35;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:200;}
+.toast::before{content:"";position:absolute;left:16px;top:50%;width:22px;height:22px;transform:translateY(-50%);border-radius:50%;background:var(--primary-light);}
+.toast::after{content:"✓";position:absolute;left:22px;top:50%;transform:translateY(-53%);color:var(--primary-dark);font-size:13px;font-weight:800;}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+.toast[data-type="error"]{border-left-color:var(--danger);}
+.toast[data-type="error"]::before{background:#FBE7E5;}
+.toast[data-type="error"]::after{content:"!";color:var(--danger);}
+.toast[data-type="warning"]{border-left-color:#B9A47C;}
+.toast[data-type="warning"]::before{background:#F3ECDC;}
+.toast[data-type="warning"]::after{content:"i";color:#806B43;}
 
 .cam-modal{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;z-index:310;opacity:0;pointer-events:none;transition:opacity .25s;overflow:hidden;}
 .cam-modal.show{opacity:1;pointer-events:auto;}

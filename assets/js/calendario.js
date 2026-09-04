@@ -175,7 +175,7 @@
     }
 
     if (dadosPeriodo.length === 0) {
-      alert("Sem registros no período para gerar imagem.");
+      App.mostrarToast("Não há registros neste período para gerar a imagem.", "warning");
       return;
     }
 
@@ -460,11 +460,11 @@
     App.on("salvarManual", "click", async () => {
       const saida = App.byId("saidaManual")?.value;
       if (!saida) {
-        alert("Preencha o horário de saída.");
+        App.mostrarToast("Informe o horário de saída antes de salvar.", "warning");
         return;
       }
       if (!manualBase64) {
-        alert("Anexe o comprovante.");
+        App.mostrarToast("Anexe uma imagem do comprovante antes de salvar.", "warning");
         return;
       }
 
@@ -490,7 +490,7 @@
         comprovantePeriodo: comprovanteInfo.periodo,
         localizacao: null,
       });
-      App.mostrarToast("Registro salvo!");
+      App.mostrarToast("Registro salvo com sucesso!");
       await renderCalendario();
       await mostrarDetalhe(key, date);
     });

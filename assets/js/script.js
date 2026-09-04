@@ -191,7 +191,7 @@
       reg = await App.Store.get(hojeKey);
     } catch (error) {
       console.error("Erro ao carregar registro de hoje:", error);
-      App.mostrarToast("Sem conexão para carregar seu registro. Verifique a internet.");
+      App.mostrarToast("Não foi possível carregar seu registro. Confira a conexão e tente novamente.", "error");
       return;
     }
 
@@ -218,7 +218,7 @@
     const existente = await App.Store.get(hojeKey);
     if (existente) {
       atualizarTravaRegistroHoje(true);
-      App.mostrarToast("Você já registrou sua saída hoje.");
+      App.mostrarToast("A saída de hoje já foi registrada.", "warning");
       return false;
     }
 
@@ -282,7 +282,7 @@
 
   function processarArquivo(file) {
     if (registroHojeTravado) {
-      App.mostrarToast("Você já registrou sua saída hoje.");
+      App.mostrarToast("A saída de hoje já foi registrada.", "warning");
       return;
     }
     comprovanteNome = App.formatComprovanteNome ? App.formatComprovanteNome(getHojeKey(), file.name) : file.name;
@@ -298,7 +298,7 @@
         capturarLocalizacao();
       } catch (error) {
         console.error("Erro ao salvar registro:", error);
-        App.mostrarToast("Erro ao salvar registro. Tente novamente.");
+        App.mostrarToast("Não foi possível salvar o registro. Tente novamente.", "error");
       }
     };
     reader.readAsDataURL(file);
@@ -381,16 +381,16 @@
   async function abrirCamera() {
     await App.Store.waitAuthReady();
     if (!App.Store.getCurrentUser()) {
-      App.mostrarToast("Faça login com Google para registrar.");
+      App.mostrarToast("Entre com o Google para registrar sua saída.", "warning");
       return;
     }
     if (registroHojeTravado) {
-      App.mostrarToast("Você já registrou sua saída hoje.");
+      App.mostrarToast("A saída de hoje já foi registrada.", "warning");
       return;
     }
     const resultado = await App.abrirCameraModal();
     if (resultado === "denied") {
-      App.mostrarToast("Permissão de câmera bloqueada. Habilite nas configurações do navegador e tente novamente.");
+      App.mostrarToast("A câmera está bloqueada. Libere a permissão no navegador e tente novamente.", "error");
       return;
     }
     if (resultado === "unsupported") {
@@ -410,7 +410,7 @@
       capturarLocalizacao();
     } catch (error) {
       console.error("Erro ao salvar registro:", error);
-      App.mostrarToast("Erro ao salvar registro. Tente novamente.");
+      App.mostrarToast("Não foi possível salvar o registro. Tente novamente.", "error");
     }
   }
 

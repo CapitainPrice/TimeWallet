@@ -156,12 +156,14 @@
     }, 2000);
   }
 
-  function mostrarToast(msg) {
+  function mostrarToast(msg, tipo = "success") {
     const toast = byId("toast");
     if (!toast) return;
     toast.textContent = msg;
+    toast.dataset.type = ["success", "error", "warning"].includes(tipo) ? tipo : "success";
     toast.classList.add("show");
-    setTimeout(() => toast.classList.remove("show"), 1800);
+    clearTimeout(mostrarToast.timer);
+    mostrarToast.timer = setTimeout(() => toast.classList.remove("show"), 2600);
   }
 
   function calcularPascoa(year) {
@@ -570,7 +572,7 @@
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    mostrarToast("Imagem salva!");
+    mostrarToast("Imagem salva com sucesso!");
   }
 
   function drawInfoCell(ctx, x, y, width, height, label, value, nota) {
@@ -969,7 +971,7 @@
         await Store.signInWithGoogle();
       } catch (error) {
         console.error("Erro no login:", error);
-        mostrarToast("Erro ao entrar. Tente novamente.");
+        mostrarToast("Não foi possível entrar com o Google. Tente novamente.", "error");
       }
       userDropdown.hidden = true;
       btnUsuario.setAttribute("aria-expanded", "false");
@@ -1007,7 +1009,7 @@
       });
     } catch (error) {
       console.warn("Firebase init failed:", error);
-      mostrarToast("Não foi possível conectar ao servidor. Usando armazenamento local.");
+      mostrarToast("Servidor indisponível. Seus dados ficarão salvos neste dispositivo.", "warning");
     }
     return Promise.resolve();
   }

@@ -120,6 +120,7 @@ users/{uid}/
 
 - Geolocalização e câmera (`getUserMedia`) exigem contexto seguro (HTTPS ou `localhost`) — abrindo como `file://` local, o navegador bloqueia essas APIs silenciosamente e cai em fallback (input de arquivo comum sem localização).
 - **Auth Google implementado**: botão de usuário no header → login/logout com Firebase Auth.
+- **Mensagens de feedback**: `App.mostrarToast(msg, tipo)` centraliza os estados de sucesso (`success`), atenção (`warning`) e erro (`error`) em um toast acessível, com ícone e cores alinhados à paleta do projeto. Avisos de formulário, exportação e permissões usam esse padrão; a confirmação da baixa de saldo continua usando `confirm()` por exigir decisão explícita antes de uma ação destrutiva.
 - **App Check recomendado**: reCAPTCHA v3 no Firebase Console para proteger API key.
 - **Regras Firestore**: travadas por `request.auth.uid == userId` (cada usuário só acessa seus dados).
 - Sem framework, sem bundler: mudanças de estrutura visual podem ficar distribuídas entre `index.html`, `views/*.html`, `assets/css/style.css` e `assets/js/*.js`.

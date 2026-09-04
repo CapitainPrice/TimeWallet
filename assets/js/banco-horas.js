@@ -191,11 +191,11 @@
     const registros = await App.Store.getAll();
     const { periodo, itens } = getComprovantesPeriodoSelecionado(registros);
     if (!periodo || itens.length === 0) {
-      alert("Sem comprovantes neste período.");
+      App.mostrarToast("Não há comprovantes neste período para baixar.", "warning");
       return;
     }
     if (!window.JSZip) {
-      alert("Biblioteca de compactação indisponível.");
+      App.mostrarToast("Não foi possível preparar o arquivo ZIP agora.", "error");
       return;
     }
 
@@ -207,7 +207,7 @@
     const blob = await zip.generateAsync({ type: "blob" });
     const nomeArquivo = `comprovantes_${formatMonthYear(periodo.start).replace("/", "-")}.zip`;
     baixarBlob(blob, nomeArquivo);
-    App.mostrarToast("Comprovantes baixados!");
+    App.mostrarToast("Comprovantes baixados com sucesso!");
   }
 
   async function gerarImagemBaixa(baixa) {
@@ -337,7 +337,7 @@
     baixaData.recibo = recibo.dataUrl;
     baixaData.reciboNome = recibo.nomeArquivo;
     await App.Store.addBaixa(hojeKey, baixaData);
-    App.mostrarToast("Baixa de saldo registrada!");
+    App.mostrarToast("Baixa de saldo registrada com sucesso!");
     baixaIndiceAtual = 0;
     await renderRegistro();
   }
@@ -351,7 +351,7 @@
   async function confirmarBaixaSaldo() {
     const resumoAtual = getResumoCiclo();
     if (resumoAtual.total === 0) {
-      App.mostrarToast("Não há saldo acumulado pra dar baixa.");
+      App.mostrarToast("Não há saldo acumulado para dar baixa.", "warning");
       return;
     }
 

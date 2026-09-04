@@ -42,6 +42,7 @@ Tudo sobre como o app calcula e se comporta, num lugar só.
 - **Splash screen**, navegação mobile e exportação de relatório em imagem
 - **Limpeza automática (destrutiva)** de registros/baixas do ano anterior, a partir de 8 de janeiro
 - **Identidade visual**: header verde-acinzentado escuro (`#5F674F`), tela de registro manual com botões de destaque (`#7B846D`) e fundos neutros (`#F0F0F0`) no lugar do verde-claro padrão, menu do usuário com item "Sair" centralizado, ícone/badge do registro salvo verde no tempo extra e vermelho no desconto
+- **Mensagens de feedback**: toasts de sucesso, atenção e erro com ícone, contraste e cores alinhados à identidade visual; validações e falhas não usam mais `alert()` nativo
 
 ## Tecnologias
 
