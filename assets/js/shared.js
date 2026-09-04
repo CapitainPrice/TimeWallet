@@ -1074,7 +1074,11 @@
       firebaseAuth.onAuthStateChanged(async (user) => {
         this._user = user;
         if (user && !this._migrated) {
-          await this._migrateLocalToFirestore();
+          try {
+            await this._migrateLocalToFirestore();
+          } catch (error) {
+            console.warn("Migração para o Firestore indisponível; usando dados locais:", error);
+          }
           this._migrated = true;
         }
         this._authReady = true;
@@ -1133,12 +1137,17 @@
       const col = this._getCollection();
       if (!col) return this.getAllSync();
 
-      const snapshot = await col.get();
-      const data = {};
-      snapshot.forEach((doc) => {
-        data[doc.id] = doc.data();
-      });
-      return data;
+      try {
+        const snapshot = await col.get();
+        const data = {};
+        snapshot.forEach((doc) => {
+          data[doc.id] = doc.data();
+        });
+        return data;
+      } catch (error) {
+        console.warn("Leitura do Firestore indisponível; usando dados locais:", error);
+        return this.getAllSync();
+      }
     },
 
     async get(dateKey) {
@@ -1207,12 +1216,17 @@
       const col = this._getBaixasCollection();
       if (!col) return this.getAllBaixasSync();
 
-      const snapshot = await col.get();
-      const data = {};
-      snapshot.forEach((doc) => {
-        data[doc.id] = doc.data();
-      });
-      return data;
+      try {
+        const snapshot = await col.get();
+        const data = {};
+        snapshot.forEach((doc) => {
+          data[doc.id] = doc.data();
+        });
+        return data;
+      } catch (error) {
+        console.warn("Leitura de baixas do Firestore indisponível; usando dados locais:", error);
+        return this.getAllBaixasSync();
+      }
     },
 
     async addBaixa(dateKey, data) {

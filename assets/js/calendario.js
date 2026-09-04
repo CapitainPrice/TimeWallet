@@ -70,6 +70,8 @@
   function abrirConfiguracaoPeriodo() {
     const modal = App.byId("periodModal");
     if (!modal) return;
+    modal.hidden = false;
+    document.body.classList.add("modal-open");
     const atual = App.getPeriodConfig();
     fillPeriodSelect("periodStartSelect", atual.startDay);
     fillPeriodSelect("periodEndSelect", atual.endDay);
@@ -79,8 +81,6 @@
     const modo = App.byId("periodConfigMode");
     if (modo) modo.value = "period";
     atualizarModoConfiguracaoPeriodo();
-    modal.hidden = false;
-    document.body.classList.add("modal-open");
   }
 
   function fecharConfiguracaoPeriodo() {
@@ -664,7 +664,12 @@
       await renderCalendario();
     },
     onAuthChange: async () => {
-      await renderCalendario();
+      try {
+        await renderCalendario();
+      } catch (error) {
+        console.error("Erro ao atualizar o calendário após autenticação:", error);
+        App.mostrarToast("Não foi possível sincronizar os registros agora.", "warning");
+      }
     },
   });
 })();
