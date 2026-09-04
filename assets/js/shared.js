@@ -860,7 +860,8 @@
 
     try {
       camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-    } catch {
+    } catch (error) {
+      if (error?.name === "NotAllowedError" || error?.name === "SecurityError") return "denied";
       return "unsupported";
     }
 
@@ -1006,9 +1007,12 @@
       firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
       firebaseAuth = firebaseApp.auth();
       firebaseDb = firebaseApp.firestore();
-      firebaseDb.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+      firebaseDb.enablePersistence({ synchronizeTabs: true }).catch((error) => {
+        console.warn("Persistência offline indisponível:", error?.code || error);
+      });
     } catch (error) {
       console.warn("Firebase init failed:", error);
+      mostrarToast("Não foi possível conectar ao servidor. Usando armazenamento local.");
     }
     return Promise.resolve();
   }
@@ -1029,11 +1033,11 @@
 
       firebaseAuth.onAuthStateChanged(async (user) => {
         this._user = user;
-        this._authReady = true;
         if (user && !this._migrated) {
           await this._migrateLocalToFirestore();
           this._migrated = true;
         }
+        this._authReady = true;
         this._notifyAuthChange(user);
       });
     },
@@ -1107,11 +1111,29 @@
       const col = this._getCollection();
       if (col) {
         await col.doc(dateKey).set(data);
-        return;
+        return this._confirmSynced();
       }
       const all = this.getAllSync();
       all[dateKey] = data;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      return true;
+    },
+
+    async _confirmSynced(timeoutMs = 6000) {
+      if (!firebaseDb || typeof firebaseDb.waitForPendingWrites !== "function") return true;
+      let timedOut = false;
+      const timeout = new Promise((resolve) => {
+        setTimeout(() => {
+          timedOut = true;
+          resolve();
+        }, timeoutMs);
+      });
+      try {
+        await Promise.race([firebaseDb.waitForPendingWrites(), timeout]);
+      } catch {
+        return false;
+      }
+      return !timedOut;
     },
 
     async _migrateLocalToFirestore() {

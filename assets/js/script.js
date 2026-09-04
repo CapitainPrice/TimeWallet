@@ -186,8 +186,16 @@
   async function carregarRegistroHoje() {
     if (!App.byId("saida")) return;
     const hojeKey = getHojeKey();
+    let reg;
+    try {
+      reg = await App.Store.get(hojeKey);
+    } catch (error) {
+      console.error("Erro ao carregar registro de hoje:", error);
+      App.mostrarToast("Sem conexão para carregar seu registro. Verifique a internet.");
+      return;
+    }
+
     limparRegistroHojeUI();
-    const reg = await App.Store.get(hojeKey);
     if (!reg) return;
 
     App.byId("saida").value = reg.saida;
@@ -231,7 +239,7 @@
       saldo: App.formatarSaldoTexto(extraMin),
     });
 
-    await App.Store.set(hojeKey, {
+    const sincronizado = await App.Store.set(hojeKey, {
       saida: saida.value,
       extraMin,
       comprovante: recibo,
@@ -242,6 +250,11 @@
     mostrarResultado(extraMin, saida.value);
     atualizarMetaComprovante(hojeKey, comprovanteNome);
     atualizarTravaRegistroHoje(true);
+    App.mostrarToast(
+      sincronizado
+        ? "Registro salvo automaticamente!"
+        : "Registro salvo localmente. Sincronizando quando a conexão melhorar."
+    );
     return true;
   }
 
@@ -282,7 +295,6 @@
       try {
         const salvou = await salvarRegistroHoje();
         if (!salvou) return;
-        App.mostrarToast("Registro salvo automaticamente!");
         capturarLocalizacao();
       } catch (error) {
         console.error("Erro ao salvar registro:", error);
@@ -338,10 +350,15 @@
       const lng = pos.coords.longitude;
       comprovanteLocalizacao = { lat, lng };
       exibirStatusGeo("Obtendo endereço...");
-      const address = await App.reverseGeocode(lat, lng);
-      comprovanteLocalizacao.address = address;
-      exibirStatusGeo(address);
-      await salvarLocalizacaoRegistroHoje();
+      try {
+        const address = await App.reverseGeocode(lat, lng);
+        comprovanteLocalizacao.address = address;
+        exibirStatusGeo(address);
+        await salvarLocalizacaoRegistroHoje();
+      } catch (error) {
+        console.error("Erro ao salvar localização:", error);
+        exibirStatusGeo("Não foi possível salvar a localização", { retry: true });
+      }
     };
 
     if (navigator.permissions?.query) {
@@ -372,6 +389,10 @@
       return;
     }
     const resultado = await App.abrirCameraModal();
+    if (resultado === "denied") {
+      App.mostrarToast("Permissão de câmera bloqueada. Habilite nas configurações do navegador e tente novamente.");
+      return;
+    }
     if (resultado === "unsupported") {
       App.byId("comprovanteCamera")?.click();
       return;
@@ -386,7 +407,6 @@
     try {
       const salvou = await salvarRegistroHoje();
       if (!salvou) return;
-      App.mostrarToast("Registro salvo automaticamente!");
       capturarLocalizacao();
     } catch (error) {
       console.error("Erro ao salvar registro:", error);
