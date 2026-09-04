@@ -112,26 +112,41 @@
         <div class="period-sheet" role="dialog" aria-modal="true" aria-labelledby="periodModalTitle">
           <div class="period-sheet-header">
             <div>
-              <div class="period-sheet-title" id="periodModalTitle">Configurar período</div>
-              <div class="period-sheet-subtitle">Escolha os dias de início e fim.</div>
+              <div class="period-sheet-title" id="periodModalTitle">Configurações Gerais</div>
+              <div class="period-sheet-subtitle">Personalize suas preferências.</div>
             </div>
             <button class="period-close-btn" id="periodCloseBtn" type="button" aria-label="Fechar configuração de período">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
           </div>
+          <label class="period-field period-mode-field" for="periodConfigMode">
+            <span>Configuração</span>
+            <select class="period-select" id="periodConfigMode">
+              <option value="period">Personalizar data do período</option>
+              <option value="point">Horário padrão do ponto</option>
+            </select>
+          </label>
           <div class="period-select-grid">
-            <label class="period-field" for="periodStartSelect">
+            <label class="period-field period-date-field" for="periodStartSelect">
               <span>Início</span>
               <select class="period-select" id="periodStartSelect"></select>
             </label>
-            <label class="period-field" for="periodEndSelect">
+            <label class="period-field period-date-field" for="periodEndSelect">
               <span>Fim</span>
               <select class="period-select" id="periodEndSelect"></select>
+            </label>
+            <label class="period-field period-time-field" for="periodPointHourSelect" hidden>
+              <span>Hora</span>
+              <select class="period-select" id="periodPointHourSelect"></select>
+            </label>
+            <label class="period-field period-time-field" for="periodPointMinuteSelect" hidden>
+              <span>Minuto</span>
+              <select class="period-select" id="periodPointMinuteSelect"></select>
             </label>
           </div>
           <div class="period-sheet-actions">
             <button class="fa-btn period-cancel-btn" id="periodCancelBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span><span>Cancelar</span></button>
-            <button class="btn period-save-btn" id="periodSaveBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path></svg></span><span>Salvar período</span></button>
+            <button class="btn period-save-btn" id="periodSaveBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><path d="M17 21v-8H7v8"></path><path d="M7 3v5h8"></path></svg></span><span id="periodSaveLabel">Salvar período</span></button>
           </div>
         </div>
       </div>

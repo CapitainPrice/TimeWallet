@@ -279,16 +279,18 @@ input[type="time"]{display:none;}
   width:min(100%,420px);background:var(--card);border-radius:26px;padding:20px 18px 18px;
   box-shadow:0 24px 54px rgba(32,41,26,.22);
 }
-.period-sheet-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;}
+.period-sheet-header{position:relative;display:flex;align-items:flex-start;justify-content:center;gap:12px;margin-bottom:16px;text-align:center;}
+.period-sheet-header > div{width:100%;}
 .period-sheet-title{font-family:Georgia,"Times New Roman",Cambria,serif;font-size:24px;color:var(--text);}
 .period-sheet-subtitle{font-size:13px;color:var(--muted);margin-top:4px;}
 .period-close-btn{
-  width:40px;height:40px;border:none;border-radius:14px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
+  position:absolute;top:0;right:0;width:40px;height:40px;border:none;border-radius:14px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
 }
 .period-close-btn svg{width:18px;height:18px;stroke:var(--primary-dark);}
 .period-select-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .period-field{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:0;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
 .period-field span{display:block;}
+.period-mode-field{margin-bottom:16px;}
 .period-select{
   width:100%;min-height:52px;padding:14px 42px 14px 16px;border:2px solid #E1E4DA;border-radius:14px;background-color:#FAFBF8;color:var(--text);
   font-size:16px;font-weight:600;-webkit-appearance:none;appearance:none;cursor:pointer;text-align:center;text-align-last:center;

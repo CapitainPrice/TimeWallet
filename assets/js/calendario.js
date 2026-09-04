@@ -59,12 +59,26 @@
     select.value = String(selectedValue);
   }
 
+  function atualizarModoConfiguracaoPeriodo() {
+    const modo = App.byId("periodConfigMode")?.value || "period";
+    document.querySelectorAll(".period-date-field").forEach((field) => { field.hidden = modo !== "period"; });
+    document.querySelectorAll(".period-time-field").forEach((field) => { field.hidden = modo !== "point"; });
+    const label = App.byId("periodSaveLabel");
+    if (label) label.textContent = modo === "point" ? "Salvar horário" : "Salvar período";
+  }
+
   function abrirConfiguracaoPeriodo() {
     const modal = App.byId("periodModal");
     if (!modal) return;
     const atual = App.getPeriodConfig();
     fillPeriodSelect("periodStartSelect", atual.startDay);
     fillPeriodSelect("periodEndSelect", atual.endDay);
+    const horario = App.getPointTimeConfig();
+    fillTimeSelect("periodPointHourSelect", horario.hour, 23);
+    fillTimeSelect("periodPointMinuteSelect", horario.minute, 59);
+    const modo = App.byId("periodConfigMode");
+    if (modo) modo.value = "period";
+    atualizarModoConfiguracaoPeriodo();
     modal.hidden = false;
     document.body.classList.add("modal-open");
   }
@@ -77,6 +91,16 @@
   }
 
   async function salvarConfiguracaoPeriodo() {
+    const modo = App.byId("periodConfigMode")?.value || "period";
+    if (modo === "point") {
+      const hour = Number(App.byId("periodPointHourSelect")?.value);
+      const minute = Number(App.byId("periodPointMinuteSelect")?.value);
+      const config = App.setPointTimeConfig(hour, minute);
+      fecharConfiguracaoPeriodo();
+      await renderCalendario();
+      App.mostrarToast(`Horário do ponto atualizado: ${String(config.hour).padStart(2, "0")}:${String(config.minute).padStart(2, "0")}`);
+      return;
+    }
     const startDay = Number(App.byId("periodStartSelect")?.value);
     const endDay = Number(App.byId("periodEndSelect")?.value);
     if (!startDay || !endDay) return;
@@ -191,7 +215,7 @@
       const comprovanteResumo = App.getComprovanteInfo(key, reg?.comprovanteNome).resumo;
       return {
         dia: `${App.DIAS_SEMANA[date.getDay()]}, ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
-        ponto: "15:00",
+        ponto: App.getPointTimeLabel(),
         saida: reg.saida,
         localizacao: App.getLocalizacaoTexto(reg.localizacao),
         comprovante: comprovanteResumo,
@@ -560,7 +584,7 @@
             <div class="di-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
             </div>
-            <div class="di-text"><span class="di-k">Horário de ponto</span><span class="di-v">15:00</span></div>
+            <div class="di-text"><span class="di-k">Horário de ponto</span><span class="di-v">${App.getPointTimeLabel()}</span></div>
           </div>
           <div class="di-row">
             <div class="di-icon">
@@ -617,6 +641,7 @@
     await renderCalendario();
   });
   App.on("periodSettingsBtn", "click", abrirConfiguracaoPeriodo);
+  App.on("periodConfigMode", "change", atualizarModoConfiguracaoPeriodo);
   App.on("periodCloseBtn", "click", fecharConfiguracaoPeriodo);
   App.on("periodCancelBtn", "click", fecharConfiguracaoPeriodo);
   App.on("periodSaveBtn", "click", salvarConfiguracaoPeriodo);

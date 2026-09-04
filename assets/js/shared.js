@@ -1,7 +1,8 @@
 (() => {
   const VIEW = document.body.dataset.view || "";
   const ROOT = document.body.dataset.root || ".";
-  const PONTO_MINUTOS = 15 * 60;
+  const PONTO_HORARIO_KEY = "bancoHoras_horarioPonto";
+  const DEFAULT_PONTO_HORARIO = Object.freeze({ hour: 15, minute: 0 });
   const TOLERANCIA_MINUTOS = 15 * 60 + 10;
   const STORAGE_KEY = "bancoHoras_registros";
   const BAIXAS_STORAGE_KEY = "bancoHoras_baixas";
@@ -83,6 +84,32 @@
     };
     localStorage.setItem(PERIOD_CONFIG_KEY, JSON.stringify(config));
     return config;
+  }
+
+  function getPointTimeConfig() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(PONTO_HORARIO_KEY) || "null");
+      const hour = Number(saved?.hour);
+      const minute = Number(saved?.minute);
+      if (Number.isInteger(hour) && Number.isInteger(minute) && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+        return { hour, minute };
+      }
+    } catch {}
+    return { ...DEFAULT_PONTO_HORARIO };
+  }
+
+  function setPointTimeConfig(hour, minute) {
+    const config = {
+      hour: Math.min(23, Math.max(0, Number(hour) || 0)),
+      minute: Math.min(59, Math.max(0, Number(minute) || 0)),
+    };
+    localStorage.setItem(PONTO_HORARIO_KEY, JSON.stringify(config));
+    return config;
+  }
+
+  function getPointTimeLabel() {
+    const config = getPointTimeConfig();
+    return `${String(config.hour).padStart(2, "0")}:${String(config.minute).padStart(2, "0")}`;
   }
 
   function getPeriodLabel(anchor) {
@@ -245,9 +272,12 @@
   function calcularExtra(saidaStr) {
     const [h, m] = saidaStr.split(":").map(Number);
     const saidaMin = h * 60 + m;
-    if (saidaMin < PONTO_MINUTOS) return saidaMin - PONTO_MINUTOS;
-    if (saidaMin <= TOLERANCIA_MINUTOS) return 0;
-    return saidaMin - TOLERANCIA_MINUTOS;
+    const ponto = getPointTimeConfig();
+    const pontoMinutos = ponto.hour * 60 + ponto.minute;
+    const toleranciaMinutos = pontoMinutos + 10;
+    if (saidaMin < pontoMinutos) return saidaMin - pontoMinutos;
+    if (saidaMin <= toleranciaMinutos) return 0;
+    return saidaMin - toleranciaMinutos;
   }
 
   function formatarExtra(min) {
@@ -655,9 +685,9 @@
     const usuarioRowH = 58;
     const linhas = [
       [
-        { label: "Horário do ponto", value: "15:00" },
+        { label: "Horário do ponto", value: getPointTimeLabel() },
         { label: "Horário de saída", value: horario },
-        { label: "Saldo", value: saldo, nota: "*Tolerância até 15:10" },
+        { label: "Saldo", value: saldo, nota: `*Tolerância a partir de ${getPointTimeLabel()}` },
       ],
       [{ label: "Localização", value: localizacao || "Não registrada" }],
     ];
@@ -1285,7 +1315,9 @@
   window.TimeWallet = {
     VIEW,
     ROOT,
-    PONTO_MINUTOS,
+    getPointTimeConfig,
+    setPointTimeConfig,
+    getPointTimeLabel,
     TOLERANCIA_MINUTOS,
     STORAGE_KEY,
     NOME_KEY,
