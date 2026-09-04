@@ -177,11 +177,13 @@ users/{uid}/
 
 **Opção A: Deploy direto (mais simples, HTTPS real)**
 ```bash
-git add index.html .gitignore
+git add .
 git commit -m "Firebase configurado"
 git push
 # Acesse: https://capitainprice.github.io/TimeWallet/
 ```
+
+O workflow cria automaticamente as rotas públicas `/calendario/`, `/banco-horas/` e `/splash/` a partir de `views/*.html`. Não crie nem versione cópias `calendario/index.html`, `banco-horas/index.html` ou `splash/index.html` manualmente.
 
 **Opção B: Local com HTTPS válido (mkcert)**
 ```bash
@@ -216,6 +218,7 @@ npx serve -l 3000
 - [ ] Teste: registro salva no Firestore (console → Data)
 - [ ] Teste: logout volta para localStorage
 - [ ] Deploy no GitHub Pages funcionando
+- [ ] Rotas limpas funcionando: `/calendario/`, `/banco-horas/` e `/splash/`
 
 ---
 

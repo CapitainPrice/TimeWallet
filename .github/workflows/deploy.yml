@@ -86,6 +86,15 @@ jobs:
           fs.writeFileSync('config.js', `window.FIREBASE_CONFIG = ${JSON.stringify(config)};\n`);
           NODE
 
+      - name: Create clean HTML routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for route in calendario banco-horas splash; do
+            mkdir -p "$route"
+            cp "views/$route.html" "$route/index.html"
+          done
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

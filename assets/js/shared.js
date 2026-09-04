@@ -875,10 +875,16 @@
   }
 
   function resolveViewPath(fileName) {
+    const routeByFile = {
+      "calendario.html": "calendario/",
+      "banco-horas.html": "banco-horas/",
+      "splash.html": "splash/",
+    };
+    const route = routeByFile[fileName] || fileName;
     if (ROOT === ".") {
-      return `views/${fileName}`;
+      return route;
     }
-    return fileName;
+    return `../${route}`;
   }
 
   function goToHome() {

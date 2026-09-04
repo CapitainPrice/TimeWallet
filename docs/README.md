@@ -8,6 +8,8 @@ App pessoal para controle de banco de horas com foco mobile. O usuário registra
 
 A navegação usa a raiz `/TimeWallet/`; `index.html` não aparece nos links e acessos diretos a esse arquivo são redirecionados para a URL sem o nome do arquivo.
 
+As views públicas usam rotas sem extensão: `/TimeWallet/calendario/`, `/TimeWallet/banco-horas/` e `/TimeWallet/splash/`. O workflow de deploy gera automaticamente um `index.html` dentro de cada pasta de rota a partir das views-fonte.
+
 ## Funcionamento e regras de negócio
 
 Tudo sobre como o app calcula e se comporta, num lugar só.
@@ -68,10 +70,9 @@ O deploy é feito pelo GitHub Actions ao enviar mudanças para a branch `main`.
 O limite é aplicado no backend, pelas funções `functions/limitarUsuariosGoogle` e `functions/removerUsuarioGoogleDoLimite`. Para ativá-lo no projeto Firebase:
 
 1. Instale a Firebase CLI e faça login: `npm install -g firebase-tools` e `firebase login`.
-2. Na raiz, inicialize Functions uma vez com `firebase init functions`, selecione o projeto existente e mantenha a pasta `functions` deste repositório.
-3. Associe o projeto: `firebase use SEU_PROJECT_ID`.
-4. Instale as dependências: `cd functions` e `npm install`.
-5. Volte à raiz e publique: `firebase deploy --only functions`.
+2. Na raiz, associe o projeto: `firebase use SEU_PROJECT_ID` (`firebase.json` já está no repositório).
+3. Instale as dependências: `cd functions` e `npm install`.
+4. Volte à raiz e publique: `firebase deploy --only functions`.
 
 O Firebase precisa aceitar Cloud Functions de identidade/blocking functions, e o blocking de Authentication precisa estar habilitado. A função consulta as contas Google reais e usa o documento `config/limiteUsuarios` para serializar cadastros simultâneos; o quarto cadastro é rejeitado antes de criar a conta Google. A função de exclusão libera a vaga quando uma conta Google é removida.
 
@@ -106,11 +107,15 @@ Para recursos como câmera e geolocalização, prefira ambiente seguro (`https` 
 │   ├── css/
 │   └── js/
 ├── docs/
+├── firebase.json
+├── functions/
 ├── index.html
 ├── logs/
 ├── views/
 └── .github/workflows/deploy.yml
 ```
+
+As pastas públicas `calendario/`, `banco-horas/` e `splash/` são criadas apenas no artefato do GitHub Pages durante o workflow; não precisam ser adicionadas ao repositório.
 
 ## Observações
 
