@@ -16,7 +16,18 @@ Thumbs.db
 # Local config
 *.local
 .env
+.env.*
 config.js
+
+# Firebase CLI / Functions
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+functions/node_modules/
+functions/.env
+functions/.env.*
+functions/.runtimeconfig.json
 
 # Logs
 *.log

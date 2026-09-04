@@ -6,6 +6,8 @@ App pessoal para controle de banco de horas com foco mobile. O usuário registra
 
 **🌐 https://capitainprice.github.io/TimeWallet/**
 
+A navegação usa a raiz `/TimeWallet/`; `index.html` não aparece nos links e acessos diretos a esse arquivo são redirecionados para a URL sem o nome do arquivo.
+
 ## Funcionamento e regras de negócio
 
 Tudo sobre como o app calcula e se comporta, num lugar só.
@@ -63,15 +65,15 @@ O deploy é feito pelo GitHub Actions ao enviar mudanças para a branch `main`.
 
 ### Limite de usuários Google
 
-O limite é aplicado no backend, pela função `functions/limitarUsuariosGoogle`. Para ativá-lo no projeto Firebase:
+O limite é aplicado no backend, pelas funções `functions/limitarUsuariosGoogle` e `functions/removerUsuarioGoogleDoLimite`. Para ativá-lo no projeto Firebase:
 
 1. Instale a Firebase CLI e faça login: `npm install -g firebase-tools` e `firebase login`.
 2. Na raiz, inicialize Functions uma vez com `firebase init functions`, selecione o projeto existente e mantenha a pasta `functions` deste repositório.
 3. Associe o projeto: `firebase use SEU_PROJECT_ID`.
 4. Instale as dependências: `cd functions` e `npm install`.
-5. Volte à raiz e publique: `firebase deploy --only functions:limitarUsuariosGoogle`.
+5. Volte à raiz e publique: `firebase deploy --only functions`.
 
-O Firebase precisa aceitar Cloud Functions de identidade/blocking functions. A função registra a quantidade de contas criadas no documento `config/limiteUsuarios`; o quarto cadastro é rejeitado antes de criar a conta Google.
+O Firebase precisa aceitar Cloud Functions de identidade/blocking functions, e o blocking de Authentication precisa estar habilitado. A função consulta as contas Google reais e usa o documento `config/limiteUsuarios` para serializar cadastros simultâneos; o quarto cadastro é rejeitado antes de criar a conta Google. A função de exclusão libera a vaga quando uma conta Google é removida.
 
 ### Requisitos do deploy
 

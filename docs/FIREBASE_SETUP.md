@@ -101,22 +101,37 @@ Protege sua API key contra uso indevido:
 
 ## 8. Limitar usuários Google a 3 contas
 
-O frontend não consegue impor esse limite com segurança. O projeto inclui a Cloud Function `functions/index.js`, que usa o gatilho `beforeUserCreated` e uma transação no Firestore para rejeitar o quarto cadastro antes da criação da conta.
+O frontend não consegue impor esse limite com segurança. O projeto inclui as Cloud Functions `limitarUsuariosGoogle` e `removerUsuarioGoogleDoLimite` em `functions/index.js`.
 
-Pré-requisitos: plano/recursos Firebase compatíveis com blocking functions e Firebase CLI instalada.
+`limitarUsuariosGoogle` usa o gatilho `beforeUserCreated`, consulta as contas Google reais já existentes e usa uma transação no Firestore para rejeitar o quarto cadastro antes da criação da conta. `removerUsuarioGoogleDoLimite` reduz o contador quando uma conta Google é excluída.
 
-```bash
+### Configuração no terminal local
+
+Execute os comandos abaixo **na raiz local do projeto**, em `C:\Users\guilherme.goncalves\TimeWallet`. O arquivo `firebase.json` já existe, então não é necessário executar `firebase init functions` novamente.
+
+```powershell
+cd C:\Users\guilherme.goncalves\TimeWallet
 npm install -g firebase-tools
 firebase login
-firebase init functions
 firebase use SEU_PROJECT_ID
 cd functions
 npm install
 cd ..
-firebase deploy --only functions:limitarUsuariosGoogle
+firebase deploy --only functions
 ```
 
-O contador fica no documento `config/limiteUsuarios` e só é acessado pelo Admin SDK da função. Para liberar uma vaga, remova a conta pelo Firebase Authentication e ajuste o campo `count` nesse documento no Firestore.
+Substitua `SEU_PROJECT_ID` pelo `projectId` do projeto no Firebase Console. O `config.js` local deste repositório não contém as credenciais do projeto; em produção, o `config.js` é gerado pelo workflow a partir do secret `FIREBASE_CONFIG`.
+
+### Configuração no Firebase Console
+
+Depois do deploy, no Firebase Console:
+
+1. Abra **Authentication → Settings → Identity Platform** e habilite o recurso, caso seja solicitado.
+2. Confirme que as **blocking functions** estão habilitadas para o projeto.
+3. Em **Authentication → Users**, confirme que existem no máximo 3 contas Google ativas.
+4. Teste uma quarta conta em uma janela anônima. Ela deve ser rejeitada antes da criação.
+
+O documento `config/limiteUsuarios` é acessado somente pelo Admin SDK da Function. A contagem real do Authentication inclui usuários criados antes do deploy.
 
 ## 9. Estrutura de dados no Firestore
 
@@ -196,7 +211,7 @@ npx serve -l 3000
 - [ ] `config.js` criado com credenciais reais
 - [ ] `config.js` no `.gitignore`
 - [ ] App Check ativado (opcional)
-- [ ] Cloud Function `limitarUsuariosGoogle` publicada (limite de 3 contas)
+- [ ] Cloud Functions `limitarUsuariosGoogle` e `removerUsuarioGoogleDoLimite` publicadas (limite de 3 contas)
 - [ ] Teste: login Google funciona
 - [ ] Teste: registro salva no Firestore (console → Data)
 - [ ] Teste: logout volta para localStorage
@@ -204,7 +219,7 @@ npx serve -l 3000
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 | Erro | Causa | Solução |
 |------|-------|---------|
@@ -216,9 +231,9 @@ npx serve -l 3000
 
 ---
 
-## 13. Próximos passos (futuro)
+## 14. Próximos passos (futuro)
 
 - [ ] Firebase Storage para fotos (hoje base64 no Firestore)
 - [ ] Sincronização em background / conflict resolution
 - [ ] Backup automático / export JSON
-- [ ] Múltiplos usuários (hoje é pessoal)
+- [x] Limite de 3 usuários Google no backend

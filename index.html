@@ -13,8 +13,13 @@
 </head>
 <body data-view="home" data-root=".">
 <div class="app">
+  <script>
+    if (window.location.pathname.endsWith("/index.html")) {
+      window.location.replace(window.location.pathname.slice(0, -"index.html".length) + window.location.search + window.location.hash);
+    }
+  </script>
   <div class="top-bar">
-    <a class="app-logo" href="index.html" aria-label="Ir para tela inicial">
+    <a class="app-logo" href="./" aria-label="Ir para tela inicial">
       <img src="assets/timewallet_logo_header.svg" alt="TimeWallet">
     </a>
   </div>

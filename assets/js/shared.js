@@ -141,7 +141,7 @@
     if (VIEW !== "home" || ROOT !== ".") return;
     if (sessionStorage.getItem(SPLASH_SESSION_KEY) === "1") return;
     const splashUrl = resolveViewPath("splash.html");
-    const nextUrl = window.location.pathname + window.location.search + window.location.hash;
+    const nextUrl = `${resolveHomePath()}${window.location.search}${window.location.hash}`;
     sessionStorage.setItem(SPLASH_SESSION_KEY, "1");
     window.location.replace(`${splashUrl}?next=${encodeURIComponent(nextUrl)}`);
   }
@@ -871,7 +871,7 @@
   }
 
   function resolveHomePath() {
-    return ROOT === "." ? "index.html" : "../index.html";
+    return ROOT === "." ? "./" : "../";
   }
 
   function resolveViewPath(fileName) {
