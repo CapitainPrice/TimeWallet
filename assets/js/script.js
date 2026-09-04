@@ -279,10 +279,15 @@
       comprovanteFotoOriginal = comprovanteBase64;
       exibirComprovante(comprovanteBase64);
       preencherHorarioAtual();
-      const salvou = await salvarRegistroHoje();
-      if (!salvou) return;
-      App.mostrarToast("Registro salvo automaticamente!");
-      capturarLocalizacao();
+      try {
+        const salvou = await salvarRegistroHoje();
+        if (!salvou) return;
+        App.mostrarToast("Registro salvo automaticamente!");
+        capturarLocalizacao();
+      } catch (error) {
+        console.error("Erro ao salvar registro:", error);
+        App.mostrarToast("Erro ao salvar registro. Tente novamente.");
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -378,10 +383,15 @@
     comprovanteFotoOriginal = comprovanteBase64;
     exibirComprovante(comprovanteBase64);
     preencherHorarioAtual();
-    const salvou = await salvarRegistroHoje();
-    if (!salvou) return;
-    App.mostrarToast("Registro salvo automaticamente!");
-    capturarLocalizacao();
+    try {
+      const salvou = await salvarRegistroHoje();
+      if (!salvou) return;
+      App.mostrarToast("Registro salvo automaticamente!");
+      capturarLocalizacao();
+    } catch (error) {
+      console.error("Erro ao salvar registro:", error);
+      App.mostrarToast("Erro ao salvar registro. Tente novamente.");
+    }
   }
 
   function agendarViradaDoDia() {

@@ -630,7 +630,7 @@
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const totalW = 640;
     const padding = 32;
 
@@ -730,7 +730,7 @@
     ctx.textAlign = "center";
     ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, totalH - padding + 6);
 
-    return canvas.toDataURL("image/png");
+    return canvas.toDataURL("image/jpeg", 0.85);
   }
 
   function obterNomeUsuario() {
