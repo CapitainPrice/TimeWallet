@@ -37,12 +37,14 @@ Tudo sobre como o app calcula e se comporta, num lugar só.
 - **Download dos comprovantes do período em ZIP** com nome intuitivo, numerado pela posição do dia no período
 - **Registro manual no calendário** pra dias liberados (a partir do seu primeiro login), com modal de seleção de horário
 - **Login com Google + sincronização no Firebase/Firestore**
+- **Limite de 3 usuários Google**: Cloud Function bloqueia o quarto cadastro antes da criação da conta, usando transação no Firestore
 - **Fallback em `localStorage`** quando não houver autenticação
 - **Geocodificação reversa** (Nominatim/OSM) resolve endereço a partir de lat/lng, com cache em memória
 - **Splash screen**, navegação mobile e exportação de relatório em imagem
 - **Limpeza automática (destrutiva)** de registros/baixas do ano anterior, a partir de 8 de janeiro
 - **Identidade visual**: header verde-acinzentado escuro (`#5F674F`), tela de registro manual com botões de destaque (`#7B846D`) e fundos neutros (`#F0F0F0`) no lugar do verde-claro padrão, menu do usuário com item "Sair" centralizado, ícone/badge do registro salvo verde no tempo extra e vermelho no desconto
 - **Mensagens de feedback**: toasts de sucesso, atenção e erro com ícone, contraste e cores alinhados à identidade visual; validações e falhas não usam mais `alert()` nativo
+- **Selects padronizados**: controles de período e horário seguem a identidade visual oliva, com chevron próprio, foco visível e estados interativos responsivos
 
 ## Tecnologias
 
@@ -58,6 +60,18 @@ Tudo sobre como o app calcula e se comporta, num lugar só.
 ## Deploy
 
 O deploy é feito pelo GitHub Actions ao enviar mudanças para a branch `main`.
+
+### Limite de usuários Google
+
+O limite é aplicado no backend, pela função `functions/limitarUsuariosGoogle`. Para ativá-lo no projeto Firebase:
+
+1. Instale a Firebase CLI e faça login: `npm install -g firebase-tools` e `firebase login`.
+2. Na raiz, inicialize Functions uma vez com `firebase init functions`, selecione o projeto existente e mantenha a pasta `functions` deste repositório.
+3. Associe o projeto: `firebase use SEU_PROJECT_ID`.
+4. Instale as dependências: `cd functions` e `npm install`.
+5. Volte à raiz e publique: `firebase deploy --only functions:limitarUsuariosGoogle`.
+
+O Firebase precisa aceitar Cloud Functions de identidade/blocking functions. A função registra a quantidade de contas criadas no documento `config/limiteUsuarios`; o quarto cadastro é rejeitado antes de criar a conta Google.
 
 ### Requisitos do deploy
 

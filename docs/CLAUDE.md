@@ -40,6 +40,7 @@ Essa regra vale em todo lugar que mostra tempo extra: card da tela inicial, deta
 - **Autenticado** → Firestore em `users/{uid}/registros/{dateKey}` — sincroniza entre dispositivos, persiste offline.
 - **Não autenticado** → `localStorage` (chave `bancoHoras_registros`) — comportamento original.
 - Migração automática `localStorage → Firestore` no primeiro login.
+- **Limite de usuários Google** → a Cloud Function `limitarUsuariosGoogle` (`functions/index.js`) usa `beforeUserCreated` e uma transação em `config/limiteUsuarios` para permitir no máximo 3 contas cadastradas. O quarto cadastro é rejeitado antes da criação da conta; a trava não deve ser substituída por validação somente no frontend.
 - **Registro diário (botão de câmera na home) exige login**: `abrirCamera()` em `script.js` bloqueia (toast "Faça login com Google para registrar.") se `Store.getCurrentUser()` for `null` — mesmo com o fallback de `localStorage` existindo tecnicamente, não dá mais pra registrar sem estar autenticado. Não afeta o registro manual do Calendário, que continua sem essa trava.
 - Firestore travado por `request.auth.uid == userId` — cada usuário só acessa os próprios dados.
 
@@ -119,8 +120,9 @@ users/{uid}/
 ## Observações técnicas
 
 - Geolocalização e câmera (`getUserMedia`) exigem contexto seguro (HTTPS ou `localhost`) — abrindo como `file://` local, o navegador bloqueia essas APIs silenciosamente e cai em fallback (input de arquivo comum sem localização).
-- **Auth Google implementado**: botão de usuário no header → login/logout com Firebase Auth.
+- **Auth Google implementado**: botão de usuário no header → login/logout com Firebase Auth. O limite de 3 contas depende da Cloud Function implantada e do plano/recursos do Firebase que suportem blocking functions.
 - **Mensagens de feedback**: `App.mostrarToast(msg, tipo)` centraliza os estados de sucesso (`success`), atenção (`warning`) e erro (`error`) em um toast acessível, com ícone e cores alinhados à paleta do projeto. Avisos de formulário, exportação e permissões usam esse padrão; a confirmação da baixa de saldo continua usando `confirm()` por exigir decisão explícita antes de uma ação destrutiva.
+- **Selects**: todos os selects de período e horário usam `.period-select`, com fundo quase branco, borda oliva clara, tipografia da interface, chevron oliva, foco destacado e estados de hover, pressionado e desabilitado alinhados à identidade visual e ao uso mobile.
 - **App Check recomendado**: reCAPTCHA v3 no Firebase Console para proteger API key.
 - **Regras Firestore**: travadas por `request.auth.uid == userId` (cada usuário só acessa seus dados).
 - Sem framework, sem bundler: mudanças de estrutura visual podem ficar distribuídas entre `index.html`, `views/*.html`, `assets/css/style.css` e `assets/js/*.js`.

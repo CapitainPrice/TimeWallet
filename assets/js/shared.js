@@ -971,7 +971,14 @@
         await Store.signInWithGoogle();
       } catch (error) {
         console.error("Erro no login:", error);
-        mostrarToast("Não foi possível entrar com o Google. Tente novamente.", "error");
+        const erroLimite = error?.code === "auth/admin-restricted-operation"
+          || error?.code === "auth/operation-not-allowed"
+          || String(error?.message || "").toLowerCase().includes("limite de 3");
+        if (erroLimite) {
+          mostrarToast("O limite de 3 usuários ativos já foi atingido.", "warning");
+        } else {
+          mostrarToast("Não foi possível entrar com o Google. Tente novamente.", "error");
+        }
       }
       userDropdown.hidden = true;
       btnUsuario.setAttribute("aria-expanded", "false");
