@@ -242,11 +242,20 @@
     const sincronizado = await App.Store.set(hojeKey, {
       saida: saida.value,
       extraMin,
+      ponto: App.getPointTimeLabel(),
       comprovante: recibo,
       comprovanteNome,
       comprovantePeriodo: comprovanteInfo.periodo,
       localizacao: comprovanteLocalizacao,
     });
+    try {
+      const agora = getAgora();
+      if (App.isUltimoDiaUtilDoPeriodo(agora)) {
+        await App.gerarESalvarRelatorioPeriodo(App.getCurrentPaymentAnchor(agora));
+      }
+    } catch (error) {
+      console.warn("Não foi possível salvar o relatório automático do período:", error);
+    }
     mostrarResultado(extraMin, saida.value);
     atualizarMetaComprovante(hojeKey, comprovanteNome);
     atualizarTravaRegistroHoje(true);

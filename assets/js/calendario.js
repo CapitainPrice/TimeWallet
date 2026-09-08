@@ -5,12 +5,6 @@
   let periodAnchor = App.getCurrentPaymentAnchor();
   let periodosCalendario = [];
 
-  function splitComprovanteResumo(resumo) {
-    const match = String(resumo || "").match(/^comprovante_([^_]+)_(.+)$/);
-    if (!match) return null;
-    return [`comprovante_`, `${match[1]}_`, match[2].replace(/_/g, " ")];
-  }
-
   function mostrarViewCalendario() {
     const calendarView = App.byId("calendarView");
     const detailView = App.byId("detailView");
@@ -186,178 +180,12 @@
   }
 
   async function gerarImagem() {
-    const { start, end } = App.getPeriodBounds(periodAnchor);
-    const registros = await App.Store.getAll();
-    const dadosPeriodo = [];
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const date = new Date(d);
-      const key = App.toKey(date);
-      const reg = registros[key];
-      if (!reg) continue;
-      dadosPeriodo.push({ key, date, reg });
-    }
-
-    if (dadosPeriodo.length === 0) {
+    const resultado = await App.gerarImagemRelatorioPeriodo(periodAnchor);
+    if (!resultado) {
       App.mostrarToast("Não há registros neste período para gerar a imagem.", "warning");
       return;
     }
-
-    const resumo = dadosPeriodo.reduce((acc, item) => {
-      acc.total += 1;
-      if (item.reg.extraMin > 0) acc.positivos += 1;
-      if (item.reg.extraMin < 0) acc.negativos += 1;
-      acc.saldo += item.reg.extraMin;
-      return acc;
-    }, { total: 0, positivos: 0, negativos: 0, saldo: 0 });
-
-    const dados = dadosPeriodo.map(({ key, date, reg }) => {
-      const comprovanteResumo = App.getComprovanteInfo(key, reg?.comprovanteNome).resumo;
-      return {
-        dia: `${App.DIAS_SEMANA[date.getDay()]}, ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
-        ponto: App.getPointTimeLabel(),
-        saida: reg.saida,
-        localizacao: App.getLocalizacaoTexto(reg.localizacao),
-        comprovante: comprovanteResumo,
-        comprovanteLinhas: splitComprovanteResumo(comprovanteResumo),
-        saldo: reg.extraMin > 0 ? `+${App.formatarExtra(reg.extraMin)}` : App.formatarExtra(reg.extraMin),
-        estado: reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "neutro",
-      };
-    });
-
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    const dpr = window.devicePixelRatio || 1;
-    const totalW = 1120;
-    const padding = 36;
-    const metricGap = 16;
-    const metricH = 82;
-    const heroH = 110;
-    const headerH = 98;
-    const rowH = 126;
-    const footerH = 68;
-    const cols = [
-      { key: "dia", label: "Dia", width: 0.23, align: "left" },
-      { key: "ponto", label: "Ponto", width: 0.09, align: "center" },
-      { key: "saida", label: "Saída", width: 0.11, align: "center" },
-      { key: "localizacao", label: "Localização", width: 0.28, align: "left" },
-      { key: "comprovante", label: "Comprovante", width: 0.17, align: "left" },
-      { key: "saldo", label: "Saldo", width: 0.12, align: "right" },
-    ];
-
-    const logoH = await App.drawLogoImage(ctx, totalW, padding, "../assets/timewallet_logo_header_black.svg", 620);
-    const titleTop = padding + logoH + 14;
-    const tableTop = titleTop + heroH + metricH + 120;
-    const totalH = tableTop + headerH + dados.length * rowH + footerH + padding;
-
-    canvas.width = totalW * dpr;
-    canvas.height = totalH * dpr;
-    ctx.scale(dpr, dpr);
-
-    ctx.fillStyle = "#F7F5EE";
-    ctx.fillRect(0, 0, totalW, totalH);
-
-    if (logoH) await App.drawLogoImage(ctx, totalW, padding, "../assets/timewallet_logo_header_black.svg", 620);
-
-    ctx.fillStyle = "#20291A";
-    ctx.font = '700 28px Georgia, "Times New Roman", serif';
-    ctx.textAlign = "center";
-    ctx.fillText("Banco de Horas", totalW / 2, titleTop + 6);
-
-    ctx.fillStyle = "#7A8570";
-    ctx.font = "600 14px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(`Período ${App.getPeriodLabel(periodAnchor)}`, totalW / 2, titleTop + 30);
-
-    const heroY = titleTop + 48;
-    App.drawRoundedRect(ctx, padding, heroY, totalW - padding * 2, heroH, 28, "#AEB49E", null);
-
-    ctx.fillStyle = "rgba(255,255,255,.82)";
-    ctx.font = "700 13px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText("Saldo do período", padding + 28, heroY + 34);
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.font = "700 38px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.fillText(App.formatarExtra(resumo.saldo), padding + 28, heroY + 76);
-
-    ctx.font = "700 24px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(App.obterNomeUsuario() || "—", totalW - padding - 28, heroY + 55);
-
-    const metricY = heroY + heroH + 18;
-    const metricW = (totalW - padding * 2 - metricGap * 2) / 3;
-    App.drawMetricCard(ctx, padding, metricY, metricW, metricH, "Registros", resumo.total, "#20291A");
-    App.drawMetricCard(ctx, padding + metricW + metricGap, metricY, metricW, metricH, "Extras", resumo.positivos, "#4A701C");
-    App.drawMetricCard(ctx, padding + (metricW + metricGap) * 2, metricY, metricW, metricH, "Descontos", resumo.negativos, "#B3261E");
-
-    App.drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, headerH + dados.length * rowH, 28, "#FFFFFF", "#AEB7A0");
-
-    let x = padding;
-    cols.forEach((col, index) => {
-      const colW = (totalW - padding * 2) * col.width;
-      App.drawCellText(ctx, col.label, x, tableTop, colW, headerH, col.align, "#000000", "700 20px -apple-system, BlinkMacSystemFont, sans-serif", 1);
-      if (index < cols.length - 1) {
-        ctx.strokeStyle = "#B2BAA7";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x + colW, tableTop + 8);
-        ctx.lineTo(x + colW, tableTop + headerH + dados.length * rowH - 8);
-        ctx.stroke();
-      }
-      x += colW;
-    });
-
-    ctx.strokeStyle = "#98A18E";
-    ctx.lineWidth = 1.7;
-    ctx.beginPath();
-    ctx.moveTo(padding + 1, tableTop + headerH);
-    ctx.lineTo(totalW - padding - 1, tableTop + headerH);
-    ctx.stroke();
-
-    let y = tableTop + headerH;
-    dados.forEach((row, index) => {
-      if (index > 0) {
-        ctx.strokeStyle = "#BCC4B2";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(padding + 1, y);
-        ctx.lineTo(totalW - padding - 1, y);
-        ctx.stroke();
-      }
-
-      let colX = padding;
-      cols.forEach((col) => {
-        const colW = (totalW - padding * 2) * col.width;
-        const isSaldo = col.key === "saldo";
-        const isSaida = col.key === "saida";
-        const color = isSaldo
-          ? row.estado === "positivo"
-            ? "#4A701C"
-            : row.estado === "negativo"
-              ? "#B3261E"
-              : "#6F7862"
-          : isSaida && row.estado === "negativo"
-            ? "#B3261E"
-            : isSaida && row.estado === "positivo"
-              ? "#375215"
-              : "#20291A";
-        const font = "700 18px -apple-system, BlinkMacSystemFont, sans-serif";
-        if (col.key === "comprovante" && row.comprovanteLinhas) {
-          App.drawCellLines(ctx, row.comprovanteLinhas, colX, y, colW, rowH, col.align, color, font);
-        } else {
-          App.drawCellText(ctx, row[col.key], colX, y, colW, rowH, col.align, color, font, col.key === "localizacao" ? 4 : col.key === "comprovante" || col.key === "dia" ? 3 : 2);
-        }
-        colX += colW;
-      });
-      y += rowH;
-    });
-
-    ctx.fillStyle = "#000000";
-    ctx.font = "700 14px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, y + 36);
-
-    canvas.toBlob((blob) => baixarImagem(blob, start, end), "image/png");
+    baixarImagem(resultado.blob, resultado.start, resultado.end);
   }
 
   function fillTimeSelect(selectId, selectedValue, maxValue) {
@@ -509,11 +337,19 @@
       await App.Store.set(key, {
         saida,
         extraMin,
+        ponto: App.getPointTimeLabel(),
         comprovante: recibo,
         comprovanteNome: comprovanteInfo.nome,
         comprovantePeriodo: comprovanteInfo.periodo,
         localizacao: null,
       });
+      try {
+        if (App.isUltimoDiaUtilDoPeriodo(date)) {
+          await App.gerarESalvarRelatorioPeriodo(App.getCurrentPaymentAnchor(date));
+        }
+      } catch (error) {
+        console.warn("Não foi possível salvar o relatório automático do período:", error);
+      }
       App.mostrarToast("Registro salvo com sucesso!");
       await renderCalendario();
       await mostrarDetalhe(key, date);
@@ -584,7 +420,7 @@
             <div class="di-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
             </div>
-            <div class="di-text"><span class="di-k">Horário de ponto</span><span class="di-v">${App.getPointTimeLabel()}</span></div>
+            <div class="di-text"><span class="di-k">Horário de ponto</span><span class="di-v">${reg.ponto || App.getPointTimeLabel()}</span></div>
           </div>
           <div class="di-row">
             <div class="di-icon">

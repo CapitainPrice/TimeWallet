@@ -326,11 +326,12 @@
     const hojeKey = App.toKey(agora);
     const horario = `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`;
     const nome = App.formatComprovanteNome ? App.formatComprovanteNome(hojeKey, "baixa.jpg") : `baixa_${hojeKey}.jpg`;
+    const fotoComprimida = await App.comprimirImagem(foto);
     const baixaData = {
       data: hojeKey,
       horario,
       saldoBaixado,
-      comprovante: foto,
+      comprovante: fotoComprimida,
       comprovanteNome: nome,
     };
     const recibo = await gerarImagemBaixa(baixaData);
@@ -490,17 +491,44 @@
     }
   }
 
+  function renderHistoricoRelatorios(relatorios) {
+    const tabela = App.byId("relatoriosTabela");
+    if (!tabela) return;
+
+    const itens = Object.entries(relatorios || {}).sort(([a], [b]) => b.localeCompare(a));
+    if (!itens.length) {
+      tabela.innerHTML = '<div class="empty-msg">Nenhum relatório gerado ainda.</div>';
+      return;
+    }
+
+    tabela.innerHTML = itens.map(([, item]) => {
+      const geradoEm = item.geradoEm ? new Date(item.geradoEm).toLocaleDateString("pt-BR") : "—";
+      return `
+        <div class="rel-row">
+          <span class="col-periodo">${item.periodo || "—"}</span>
+          <span class="col-gerado">${geradoEm}</span>
+          <span class="col-baixar">
+            <a class="rel-baixar-btn" href="${item.imagem}" download="${item.nomeArquivo || "relatorio.png"}" aria-label="Baixar relatório do período ${item.periodo || ""}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg>
+            </a>
+          </span>
+        </div>`;
+    }).join("");
+  }
+
   async function renderRegistro() {
     if (!App.byId("regPeriodoLabel")) return;
 
     const registros = await App.Store.getAll();
     const baixas = await App.Store.getAllBaixas();
+    const relatorios = await App.Store.getAllRelatorios();
     preencherPeriodosComprovante(registros);
     atualizarCabecalhoPeriodo();
     const { start, end } = App.getPeriodBounds(registroAnchor);
     const anoCiclo = comprovantePeriodos[0]?.anchor.getFullYear() ?? new Date().getFullYear();
     ultimaBaixaKey = getUltimaBaixaDoAno(baixas, anoCiclo);
     renderHistoricoBaixas(baixas);
+    renderHistoricoRelatorios(relatorios);
     regDadosPeriodo = [];
     regDadosCiclo = [];
 

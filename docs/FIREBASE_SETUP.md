@@ -67,24 +67,17 @@ O `.gitignore` já inclui `config.js` — **nunca commite este arquivo**.
 
 ## 6. Configurar Regras de Segurança do Firestore (OBRIGATÓRIO)
 
-No console **Firestore → Rules**, substitua **tudo** por:
+A regra fica versionada em `firestore.rules` (raiz do repo) e referenciada em `firebase.json` (`"firestore": {"rules": "firestore.rules"}`). Publique com:
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
+```bash
+firebase deploy --only firestore:rules
 ```
+
+Ou, se preferir manualmente, cole o conteúdo de `firestore.rules` no console **Firestore → Rules** e clique em **Publish**.
 
 > A regra usa `{document=**}` (recursiva) porque o app grava em **duas** subcoleções por usuário — `registros` e `baixas`. Uma regra que trave só `registros/{docId}` deixa `baixas` sem regra alguma, e toda leitura de `baixas` (usada pelo Banco de Horas) cai em **negado por padrão**, com erro `Missing or insufficient permissions` — quebrando a tela inteira mesmo com login correto.
 
-→ **Publish**
-
-**Por que isso importa:** Garante que cada usuário só lê/escreve **seus próprios dados**. Ninguém acessa dados de outro usuário.
+**Por que isso importa:** Garante que cada usuário só lê/escreve **seus próprios dados**. Ninguém acessa dados de outro usuário. Ao recriar/reconfigurar o projeto Firebase do zero, rodar o deploy acima evita ficar sem regra nenhuma publicada (acesso bloqueado ou inseguro por padrão).
 
 ---
 

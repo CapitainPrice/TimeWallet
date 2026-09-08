@@ -3,9 +3,10 @@
   const ROOT = document.body.dataset.root || ".";
   const PONTO_HORARIO_KEY = "bancoHoras_horarioPonto";
   const DEFAULT_PONTO_HORARIO = Object.freeze({ hour: 15, minute: 0 });
-  const TOLERANCIA_MINUTOS = 15 * 60 + 10;
+  const TOLERANCIA_MINUTOS = 10;
   const STORAGE_KEY = "bancoHoras_registros";
   const BAIXAS_STORAGE_KEY = "bancoHoras_baixas";
+  const RELATORIOS_STORAGE_KEY = "bancoHoras_relatorios";
   const NOME_KEY = "bancoHoras_nome";
   const PERIOD_CONFIG_KEY = "bancoHoras_periodo";
   const SPLASH_SESSION_KEY = "timewallet_splash_seen";
@@ -110,6 +111,14 @@
   function getPointTimeLabel() {
     const config = getPointTimeConfig();
     return `${String(config.hour).padStart(2, "0")}:${String(config.minute).padStart(2, "0")}`;
+  }
+
+  function getPointTimeToleranceLabel() {
+    const config = getPointTimeConfig();
+    const toleranciaMinutos = config.hour * 60 + config.minute + TOLERANCIA_MINUTOS;
+    const hour = Math.floor(toleranciaMinutos / 60) % 24;
+    const minute = toleranciaMinutos % 60;
+    return `*Tolerância até ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
   }
 
   function getPeriodLabel(anchor) {
@@ -245,6 +254,17 @@
     return !feriadosDoAno(date.getFullYear()).has(toKey(date));
   }
 
+  function isUltimoDiaUtilDoPeriodo(date) {
+    if (!isDiaUtil(date)) return false;
+    const anchor = getCurrentPaymentAnchor(date);
+    const { end } = getPeriodBounds(anchor);
+    for (let d = new Date(date); d <= end; d.setDate(d.getDate() + 1)) {
+      if (toKey(d) === toKey(date)) continue;
+      if (isDiaUtil(d)) return false;
+    }
+    return true;
+  }
+
   async function reverseGeocode(lat, lng) {
     const key = `${lat.toFixed(5)},${lng.toFixed(5)}`;
     if (GEOCODING_CACHE.has(key)) return GEOCODING_CACHE.get(key);
@@ -274,7 +294,7 @@
     const saidaMin = h * 60 + m;
     const ponto = getPointTimeConfig();
     const pontoMinutos = ponto.hour * 60 + ponto.minute;
-    const toleranciaMinutos = pontoMinutos + 10;
+    const toleranciaMinutos = pontoMinutos + TOLERANCIA_MINUTOS;
     if (saidaMin < pontoMinutos) return saidaMin - pontoMinutos;
     if (saidaMin <= toleranciaMinutos) return 0;
     return saidaMin - toleranciaMinutos;
@@ -548,13 +568,17 @@
     ctx.font = font;
     ctx.textAlign = align;
     const pad = 10;
+    const maxW = Math.max(24, width - pad * 2);
+    const fittedLines = lines.map((line) =>
+      ctx.measureText(line).width > maxW ? fitTextWithEllipsis(ctx, line, maxW) : line
+    );
     const fontSizeMatch = font.match(/(\d+)px/);
     const fontSize = fontSizeMatch ? Number(fontSizeMatch[1]) : 14;
     const lineHeight = Math.round(fontSize * 1.4);
-    const totalHeight = lines.length * lineHeight;
+    const totalHeight = fittedLines.length * lineHeight;
     const baseX = align === "left" ? x + pad : align === "right" ? x + width - pad : x + width / 2;
     let currentY = y + (height - totalHeight) / 2 + lineHeight * 0.75;
-    lines.forEach((line) => {
+    fittedLines.forEach((line) => {
       ctx.fillText(line, baseX, currentY);
       currentY += lineHeight;
     });
@@ -687,7 +711,7 @@
       [
         { label: "Horário do ponto", value: getPointTimeLabel() },
         { label: "Horário de saída", value: horario },
-        { label: "Saldo", value: saldo, nota: `*Tolerância a partir de ${getPointTimeLabel()}` },
+        { label: "Saldo", value: saldo, nota: getPointTimeToleranceLabel() },
       ],
       [{ label: "Localização", value: localizacao || "Não registrada" }],
     ];
@@ -765,6 +789,210 @@
     return canvas.toDataURL("image/jpeg", 0.85);
   }
 
+  async function gerarImagemRelatorioPeriodo(anchor) {
+    const { start, end } = getPeriodBounds(anchor);
+    const registros = await Store.getAll();
+    const dadosPeriodo = [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const date = new Date(d);
+      const key = toKey(date);
+      const reg = registros[key];
+      if (!reg) continue;
+      dadosPeriodo.push({ key, date, reg });
+    }
+
+    if (dadosPeriodo.length === 0) return null;
+
+    const resumo = dadosPeriodo.reduce((acc, item) => {
+      acc.total += 1;
+      if (item.reg.extraMin > 0) acc.positivos += 1;
+      if (item.reg.extraMin < 0) acc.negativos += 1;
+      acc.saldo += item.reg.extraMin;
+      return acc;
+    }, { total: 0, positivos: 0, negativos: 0, saldo: 0 });
+
+    const dados = dadosPeriodo.map(({ key, date, reg }) => {
+      const comprovanteResumo = getComprovanteInfo(key, reg?.comprovanteNome).resumo;
+      return {
+        dia: `${DIAS_SEMANA[date.getDay()]}, ${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")}/${date.getFullYear()}`,
+        ponto: reg.ponto || getPointTimeLabel(),
+        saida: reg.saida,
+        localizacao: getLocalizacaoTexto(reg.localizacao),
+        comprovante: comprovanteResumo.replace(/_/g, " "),
+        saldo: reg.extraMin > 0 ? `+${formatarExtra(reg.extraMin)}` : formatarExtra(reg.extraMin),
+        estado: reg.extraMin < 0 ? "negativo" : reg.extraMin > 0 ? "positivo" : "neutro",
+      };
+    });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const totalW = 1120;
+    const padding = 36;
+    const metricGap = 16;
+    const metricH = 82;
+    const heroH = 110;
+    const headerH = 98;
+    const baseRowH = 126;
+    const footerH = 68;
+    const cols = [
+      { key: "dia", label: "Dia", width: 0.23, align: "left" },
+      { key: "ponto", label: "Ponto", width: 0.09, align: "center" },
+      { key: "saida", label: "Saída", width: 0.11, align: "center" },
+      { key: "localizacao", label: "Localização", width: 0.28, align: "left" },
+      { key: "comprovante", label: "Comprovante", width: 0.17, align: "left" },
+      { key: "saldo", label: "Saldo", width: 0.12, align: "right" },
+    ];
+
+    const rowFont = "700 18px -apple-system, BlinkMacSystemFont, sans-serif";
+    const comprovanteCol = cols.find((col) => col.key === "comprovante");
+    const comprovanteColW = (totalW - padding * 2) * comprovanteCol.width;
+    const comprovanteMaxW = Math.max(24, comprovanteColW - 20);
+    const lineHeight = Math.round(18 * 1.4);
+    ctx.font = rowFont;
+    dados.forEach((row) => {
+      row.comprovanteLinhas = wrapText(ctx, row.comprovante, comprovanteMaxW, Infinity);
+      row.rowH = Math.max(baseRowH, row.comprovanteLinhas.length * lineHeight + 30);
+    });
+    const tabelaH = dados.reduce((acc, row) => acc + row.rowH, 0);
+
+    const logoH = await drawLogoImage(ctx, totalW, padding, `${ROOT}/assets/timewallet_logo_header_black.svg`, 620);
+    const titleTop = padding + logoH + 14;
+    const tableTop = titleTop + heroH + metricH + 120;
+    const totalH = tableTop + headerH + tabelaH + footerH + padding;
+
+    canvas.width = totalW * dpr;
+    canvas.height = totalH * dpr;
+    ctx.scale(dpr, dpr);
+
+    ctx.fillStyle = "#F7F5EE";
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    if (logoH) await drawLogoImage(ctx, totalW, padding, `${ROOT}/assets/timewallet_logo_header_black.svg`, 620);
+
+    ctx.fillStyle = "#20291A";
+    ctx.font = '700 28px Georgia, "Times New Roman", serif';
+    ctx.textAlign = "center";
+    ctx.fillText("Banco de Horas", totalW / 2, titleTop + 6);
+
+    ctx.fillStyle = "#7A8570";
+    ctx.font = "600 14px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(`Período ${getPeriodLabel(anchor)}`, totalW / 2, titleTop + 30);
+
+    const heroY = titleTop + 48;
+    drawRoundedRect(ctx, padding, heroY, totalW - padding * 2, heroH, 28, "#AEB49E", null);
+
+    ctx.fillStyle = "rgba(255,255,255,.82)";
+    ctx.font = "700 13px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Saldo do período", padding + 28, heroY + 34);
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "700 38px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillText(formatarExtra(resumo.saldo), padding + 28, heroY + 76);
+
+    ctx.font = "700 24px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(obterNomeUsuario() || "—", totalW - padding - 28, heroY + 55);
+
+    const metricY = heroY + heroH + 18;
+    const metricW = (totalW - padding * 2 - metricGap * 2) / 3;
+    drawMetricCard(ctx, padding, metricY, metricW, metricH, "Registros", resumo.total, "#20291A");
+    drawMetricCard(ctx, padding + metricW + metricGap, metricY, metricW, metricH, "Extras", resumo.positivos, "#4A701C");
+    drawMetricCard(ctx, padding + (metricW + metricGap) * 2, metricY, metricW, metricH, "Descontos", resumo.negativos, "#B3261E");
+
+    drawRoundedRect(ctx, padding, tableTop, totalW - padding * 2, headerH + tabelaH, 28, "#FFFFFF", "#AEB7A0");
+
+    let x = padding;
+    cols.forEach((col, index) => {
+      const colW = (totalW - padding * 2) * col.width;
+      drawCellText(ctx, col.label, x, tableTop, colW, headerH, col.align, "#000000", "700 20px -apple-system, BlinkMacSystemFont, sans-serif", 1);
+      if (index < cols.length - 1) {
+        ctx.strokeStyle = "#B2BAA7";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x + colW, tableTop + 8);
+        ctx.lineTo(x + colW, tableTop + headerH + tabelaH - 8);
+        ctx.stroke();
+      }
+      x += colW;
+    });
+
+    ctx.strokeStyle = "#98A18E";
+    ctx.lineWidth = 1.7;
+    ctx.beginPath();
+    ctx.moveTo(padding + 1, tableTop + headerH);
+    ctx.lineTo(totalW - padding - 1, tableTop + headerH);
+    ctx.stroke();
+
+    let y = tableTop + headerH;
+    dados.forEach((row, index) => {
+      if (index > 0) {
+        ctx.strokeStyle = "#BCC4B2";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(padding + 1, y);
+        ctx.lineTo(totalW - padding - 1, y);
+        ctx.stroke();
+      }
+
+      let colX = padding;
+      cols.forEach((col) => {
+        const colW = (totalW - padding * 2) * col.width;
+        const isSaldo = col.key === "saldo";
+        const isSaida = col.key === "saida";
+        const color = isSaldo
+          ? row.estado === "positivo"
+            ? "#4A701C"
+            : row.estado === "negativo"
+              ? "#B3261E"
+              : "#6F7862"
+          : isSaida && row.estado === "negativo"
+            ? "#B3261E"
+            : isSaida && row.estado === "positivo"
+              ? "#375215"
+              : "#20291A";
+        const font = rowFont;
+        if (col.key === "comprovante" && row.comprovanteLinhas) {
+          drawCellLines(ctx, row.comprovanteLinhas, colX, y, colW, row.rowH, col.align, color, font);
+        } else {
+          drawCellText(ctx, row[col.key], colX, y, colW, row.rowH, col.align, color, font, col.key === "localizacao" ? 4 : col.key === "dia" ? 3 : 2);
+        }
+        colX += colW;
+      });
+      y += row.rowH;
+    });
+
+    ctx.fillStyle = "#000000";
+    ctx.font = "700 14px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`Gerado em ${new Date().toLocaleString("pt-BR")}`, totalW / 2, y + 36);
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        resolve({ blob, dataUrl: canvas.toDataURL("image/png"), start, end, resumo });
+      }, "image/png");
+    });
+  }
+
+  function getRelatorioNomeArquivo(start, end) {
+    return `banco-horas_${fmtCurta(start).replace("/", "-")}_a_${fmtCurta(end).replace("/", "-")}-${end.getFullYear()}.png`;
+  }
+
+  async function gerarESalvarRelatorioPeriodo(anchor) {
+    const resultado = await gerarImagemRelatorioPeriodo(anchor);
+    if (!resultado) return null;
+    const periodoKey = toKey(anchor);
+    await Store.setRelatorio(periodoKey, {
+      periodo: getPeriodLabel(anchor),
+      geradoEm: new Date().toISOString(),
+      imagem: resultado.dataUrl,
+      nomeArquivo: getRelatorioNomeArquivo(resultado.start, resultado.end),
+    });
+    return resultado;
+  }
+
   function obterNomeUsuario() {
     let nome = localStorage.getItem(NOME_KEY);
     if (nome === null) {
@@ -772,6 +1000,23 @@
       localStorage.setItem(NOME_KEY, nome);
     }
     return nome;
+  }
+
+  function comprimirImagem(dataUrl, maxDim = 1280, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * ratio);
+        canvas.height = Math.round(img.naturalHeight * ratio);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
   }
 
   function getLocationDisplay(loc) {
@@ -1113,6 +1358,11 @@
       return firebaseDb.collection("users").doc(this._user.uid).collection("baixas");
     },
 
+    _getRelatoriosCollection() {
+      if (!this._user || !firebaseDb) return null;
+      return firebaseDb.collection("users").doc(this._user.uid).collection("relatorios");
+    },
+
     async signInWithGoogle() {
       if (!firebaseAuth) throw new Error("Firebase não inicializado");
       const provider = new firebase.auth.GoogleAuthProvider();
@@ -1124,9 +1374,14 @@
       return firebaseAuth.signOut();
     },
 
+    _localKey(base) {
+      const uid = this._user && this._user.uid;
+      return uid ? `${base}_${uid}` : base;
+    },
+
     getAllSync() {
       try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        return JSON.parse(localStorage.getItem(this._localKey(STORAGE_KEY))) || {};
       } catch {
         return {};
       }
@@ -1164,7 +1419,7 @@
       }
       const all = this.getAllSync();
       all[dateKey] = data;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      localStorage.setItem(this._localKey(STORAGE_KEY), JSON.stringify(all));
       return true;
     },
 
@@ -1186,8 +1441,14 @@
     },
 
     async _migrateLocalToFirestore() {
-      const localData = this.getAllSync();
-      const localBaixas = this.getAllBaixasSync();
+      let localData = {};
+      let localBaixas = {};
+      try {
+        localData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+      } catch { /* ignore corrupt local data */ }
+      try {
+        localBaixas = JSON.parse(localStorage.getItem(BAIXAS_STORAGE_KEY)) || {};
+      } catch { /* ignore corrupt local data */ }
       const keys = Object.keys(localData);
       const baixaKeys = Object.keys(localBaixas);
       if (keys.length === 0 && baixaKeys.length === 0) return;
@@ -1205,7 +1466,7 @@
 
     getAllBaixasSync() {
       try {
-        return JSON.parse(localStorage.getItem(BAIXAS_STORAGE_KEY)) || {};
+        return JSON.parse(localStorage.getItem(this._localKey(BAIXAS_STORAGE_KEY))) || {};
       } catch {
         return {};
       }
@@ -1238,7 +1499,7 @@
       }
       const all = this.getAllBaixasSync();
       all[dateKey] = data;
-      localStorage.setItem(BAIXAS_STORAGE_KEY, JSON.stringify(all));
+      localStorage.setItem(this._localKey(BAIXAS_STORAGE_KEY), JSON.stringify(all));
     },
 
     async removeMany(keys) {
@@ -1256,7 +1517,7 @@
       }
       const all = this.getAllSync();
       keys.forEach((key) => delete all[key]);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+      localStorage.setItem(this._localKey(STORAGE_KEY), JSON.stringify(all));
     },
 
     async removeBaixasMany(keys) {
@@ -1274,7 +1535,63 @@
       }
       const all = this.getAllBaixasSync();
       keys.forEach((key) => delete all[key]);
-      localStorage.setItem(BAIXAS_STORAGE_KEY, JSON.stringify(all));
+      localStorage.setItem(this._localKey(BAIXAS_STORAGE_KEY), JSON.stringify(all));
+    },
+
+    getAllRelatoriosSync() {
+      try {
+        return JSON.parse(localStorage.getItem(this._localKey(RELATORIOS_STORAGE_KEY))) || {};
+      } catch {
+        return {};
+      }
+    },
+
+    async getAllRelatorios() {
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getRelatoriosCollection();
+      if (!col) return this.getAllRelatoriosSync();
+
+      try {
+        const snapshot = await col.get();
+        const data = {};
+        snapshot.forEach((doc) => {
+          data[doc.id] = doc.data();
+        });
+        return data;
+      } catch (error) {
+        console.warn("Leitura de relatórios do Firestore indisponível; usando dados locais:", error);
+        return this.getAllRelatoriosSync();
+      }
+    },
+
+    async setRelatorio(periodoKey, data) {
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getRelatoriosCollection();
+      if (col) {
+        await col.doc(periodoKey).set(data);
+        return;
+      }
+      const all = this.getAllRelatoriosSync();
+      all[periodoKey] = data;
+      localStorage.setItem(this._localKey(RELATORIOS_STORAGE_KEY), JSON.stringify(all));
+    },
+
+    async removeRelatoriosMany(keys) {
+      if (!keys.length) return;
+      while (!this._authReady) await new Promise((resolve) => setTimeout(resolve, 50));
+      const col = this._getRelatoriosCollection();
+      if (col) {
+        for (let i = 0; i < keys.length; i += 450) {
+          const lote = keys.slice(i, i + 450);
+          const batch = firebaseDb.batch();
+          lote.forEach((key) => batch.delete(col.doc(key)));
+          await batch.commit();
+        }
+        return;
+      }
+      const all = this.getAllRelatoriosSync();
+      keys.forEach((key) => delete all[key]);
+      localStorage.setItem(this._localKey(RELATORIOS_STORAGE_KEY), JSON.stringify(all));
     },
   };
 
@@ -1294,11 +1611,12 @@
     if (ultimoAnoLimpo >= anoAtual) return;
 
     const anoAnterior = anoAtual - 1;
-    const [registros, baixas] = await Promise.all([Store.getAll(), Store.getAllBaixas()]);
+    const [registros, baixas, relatorios] = await Promise.all([Store.getAll(), Store.getAllBaixas(), Store.getAllRelatorios()]);
     const chavesRegistros = Object.keys(registros).filter((key) => key.startsWith(`${anoAnterior}-`));
     const chavesBaixas = Object.keys(baixas).filter((key) => key.startsWith(`${anoAnterior}-`));
+    const chavesRelatorios = Object.keys(relatorios).filter((key) => key.startsWith(`${anoAnterior}-`));
 
-    await Promise.all([Store.removeMany(chavesRegistros), Store.removeBaixasMany(chavesBaixas)]);
+    await Promise.all([Store.removeMany(chavesRegistros), Store.removeBaixasMany(chavesBaixas), Store.removeRelatoriosMany(chavesRelatorios)]);
     localStorage.setItem(chaveConfig, String(anoAtual));
   }
 
@@ -1349,12 +1667,14 @@
     renderDataPrincipal,
     mostrarToast,
     calcularExtra,
+    comprimirImagem,
     formatarExtra,
     formatarSaldoTexto,
     getPeriodBounds,
     getCurrentPaymentAnchor,
     obterNomeUsuario,
     isDiaUtil,
+    isUltimoDiaUtilDoPeriodo,
     reverseGeocode,
     getLocationDisplay,
     getLocationMapLink,
@@ -1389,6 +1709,8 @@
     drawLogoImage,
     baixarImagemRelatorio,
     gerarComprovanteRegistro,
+    gerarImagemRelatorioPeriodo,
+    gerarESalvarRelatorioPeriodo,
     goToHome,
     goToCalendario,
     goToRegistro,
