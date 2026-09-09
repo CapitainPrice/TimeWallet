@@ -4,6 +4,7 @@
 
   let periodAnchor = App.getCurrentPaymentAnchor();
   let periodosCalendario = [];
+  let localizacaoPadraoSelecionada = null;
 
   function mostrarViewCalendario() {
     const calendarView = App.byId("calendarView");
@@ -57,8 +58,34 @@
     const modo = App.byId("periodConfigMode")?.value || "period";
     document.querySelectorAll(".period-date-field").forEach((field) => { field.hidden = modo !== "period"; });
     document.querySelectorAll(".period-time-field").forEach((field) => { field.hidden = modo !== "point"; });
+    document.querySelectorAll(".period-location-field").forEach((field) => { field.hidden = modo !== "location"; });
     const label = App.byId("periodSaveLabel");
-    if (label) label.textContent = modo === "point" ? "Salvar horário" : "Salvar período";
+    if (label) label.textContent = modo === "point" ? "Salvar horário" : modo === "location" ? "Salvar localização" : "Salvar período";
+  }
+
+  async function usarLocalizacaoAtualPadrao() {
+    const status = App.byId("periodLocationStatus");
+    const input = App.byId("periodLocationInput");
+    if (!navigator.geolocation) {
+      if (status) status.textContent = "Localização não suportada neste dispositivo";
+      return;
+    }
+    if (status) status.textContent = "Obtendo localização...";
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        if (status) status.textContent = "Obtendo endereço...";
+        const address = await App.reverseGeocode(lat, lng);
+        localizacaoPadraoSelecionada = { lat, lng, address };
+        if (input) input.value = address;
+        if (status) status.textContent = "Localização obtida.";
+      },
+      () => {
+        if (status) status.textContent = "Não foi possível obter a localização. Ative o GPS e tente novamente.";
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
   }
 
   function abrirConfiguracaoPeriodo() {
@@ -72,6 +99,11 @@
     const horario = App.getPointTimeConfig();
     fillTimeSelect("periodPointHourSelect", horario.hour, 23);
     fillTimeSelect("periodPointMinuteSelect", horario.minute, 59);
+    localizacaoPadraoSelecionada = App.getDefaultLocationConfig();
+    const locInput = App.byId("periodLocationInput");
+    if (locInput) locInput.value = localizacaoPadraoSelecionada?.address || "";
+    const locStatus = App.byId("periodLocationStatus");
+    if (locStatus) locStatus.textContent = "";
     const modo = App.byId("periodConfigMode");
     if (modo) modo.value = "period";
     atualizarModoConfiguracaoPeriodo();
@@ -93,6 +125,28 @@
       fecharConfiguracaoPeriodo();
       await renderCalendario();
       App.mostrarToast(`Horário do ponto atualizado: ${String(config.hour).padStart(2, "0")}:${String(config.minute).padStart(2, "0")}`);
+      return;
+    }
+    if (modo === "location") {
+      const address = App.byId("periodLocationInput")?.value?.trim() || "";
+      let location = null;
+      if (address) {
+        if (localizacaoPadraoSelecionada && localizacaoPadraoSelecionada.address === address) {
+          location = localizacaoPadraoSelecionada;
+        } else {
+          const status = App.byId("periodLocationStatus");
+          if (status) status.textContent = "Buscando endereço...";
+          location = await App.geocodeAddress(address);
+          if (!location) {
+            App.mostrarToast("Endereço não encontrado. Tente ser mais específico.", "warning");
+            if (status) status.textContent = "";
+            return;
+          }
+        }
+      }
+      App.setDefaultLocationConfig(location);
+      fecharConfiguracaoPeriodo();
+      App.mostrarToast(location ? `Localização padrão definida: ${location.address}` : "Localização padrão removida");
       return;
     }
     const startDay = Number(App.byId("periodStartSelect")?.value);
@@ -321,6 +375,7 @@
       }
 
       const extraMin = App.calcularExtra(saida);
+      const localizacaoPadrao = App.getDefaultLocationConfig();
       const comprovanteInfo = App.getComprovanteInfo ? App.getComprovanteInfo(key, manualNome) : {
         nome: manualNome,
         titulo: manualNome,
@@ -330,7 +385,7 @@
         foto: manualBase64,
         data: dataFmt,
         horario: saida,
-        localizacao: null,
+        localizacao: localizacaoPadrao,
         usuario: App.obterNomeUsuario(),
         saldo: App.formatarSaldoTexto(extraMin),
       });
@@ -341,7 +396,7 @@
         comprovante: recibo,
         comprovanteNome: comprovanteInfo.nome,
         comprovantePeriodo: comprovanteInfo.periodo,
-        localizacao: null,
+        localizacao: localizacaoPadrao,
       });
       try {
         if (App.isUltimoDiaUtilDoPeriodo(date)) {
@@ -478,6 +533,8 @@
   });
   App.on("periodSettingsBtn", "click", abrirConfiguracaoPeriodo);
   App.on("periodConfigMode", "change", atualizarModoConfiguracaoPeriodo);
+  App.on("periodLocationCurrentBtn", "click", usarLocalizacaoAtualPadrao);
+  App.on("periodLocationInput", "input", () => { localizacaoPadraoSelecionada = null; });
   App.on("periodCloseBtn", "click", fecharConfiguracaoPeriodo);
   App.on("periodCancelBtn", "click", fecharConfiguracaoPeriodo);
   App.on("periodSaveBtn", "click", salvarConfiguracaoPeriodo);

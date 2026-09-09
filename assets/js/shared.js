@@ -9,6 +9,7 @@
   const RELATORIOS_STORAGE_KEY = "bancoHoras_relatorios";
   const NOME_KEY = "bancoHoras_nome";
   const PERIOD_CONFIG_KEY = "bancoHoras_periodo";
+  const DEFAULT_LOCATION_KEY = "bancoHoras_localizacaoPadrao";
   const SPLASH_SESSION_KEY = "timewallet_splash_seen";
   const DEFAULT_PERIOD_CONFIG = Object.freeze({ startDay: 26, endDay: 25 });
   const COMPROVANTE_PERIODO_MESES = 6;
@@ -111,6 +112,54 @@
   function getPointTimeLabel() {
     const config = getPointTimeConfig();
     return `${String(config.hour).padStart(2, "0")}:${String(config.minute).padStart(2, "0")}`;
+  }
+
+  function getDefaultLocationConfig() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(DEFAULT_LOCATION_KEY) || "null");
+      if (saved && typeof saved.address === "string" && saved.address) {
+        return {
+          lat: typeof saved.lat === "number" ? saved.lat : null,
+          lng: typeof saved.lng === "number" ? saved.lng : null,
+          address: saved.address,
+        };
+      }
+    } catch {}
+    return null;
+  }
+
+  function setDefaultLocationConfig(location) {
+    if (!location || !location.address) {
+      localStorage.removeItem(DEFAULT_LOCATION_KEY);
+      return null;
+    }
+    const config = {
+      lat: typeof location.lat === "number" ? location.lat : null,
+      lng: typeof location.lng === "number" ? location.lng : null,
+      address: String(location.address),
+    };
+    localStorage.setItem(DEFAULT_LOCATION_KEY, JSON.stringify(config));
+    return config;
+  }
+
+  async function geocodeAddress(address) {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&accept-language=pt-BR&limit=1`,
+        { headers: { Accept: "application/json" } }
+      );
+      if (!response.ok) throw new Error("Geocoding failed");
+      const data = await response.json();
+      const result = data?.[0];
+      if (!result) return null;
+      const address2 = result.display_name
+        ? result.display_name.split(",").map((item) => item.trim()).slice(0, 3).filter((item) => item.length > 1).join(", ")
+        : address;
+      return { lat: Number(result.lat), lng: Number(result.lon), address: address2 };
+    } catch (error) {
+      console.warn("Forward geocoding error:", error);
+      return null;
+    }
   }
 
   function getPointTimeToleranceLabel() {
@@ -1650,6 +1699,9 @@
     getPointTimeConfig,
     setPointTimeConfig,
     getPointTimeLabel,
+    getDefaultLocationConfig,
+    setDefaultLocationConfig,
+    geocodeAddress,
     TOLERANCIA_MINUTOS,
     STORAGE_KEY,
     NOME_KEY,

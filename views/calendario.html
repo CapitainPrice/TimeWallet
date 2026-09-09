@@ -124,6 +124,7 @@
             <select class="period-select" id="periodConfigMode">
               <option value="period">Personalizar data do período</option>
               <option value="point">Horário padrão do ponto</option>
+              <option value="location">Localização padrão</option>
             </select>
           </label>
           <div class="period-select-grid">
@@ -143,6 +144,15 @@
               <span>Minuto</span>
               <select class="period-select" id="periodPointMinuteSelect"></select>
             </label>
+          </div>
+          <div class="period-field period-location-field" hidden>
+            <span>Localização padrão</span>
+            <input type="text" class="period-select" id="periodLocationInput" placeholder="Digite um endereço ou use sua localização atual">
+            <button class="fa-btn" id="periodLocationCurrentBtn" type="button" style="width:100%;margin-top:8px;">
+              <span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg></span>
+              <span>Usar localização atual</span>
+            </button>
+            <div id="periodLocationStatus" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
           </div>
           <div class="period-sheet-actions">
             <button class="fa-btn period-cancel-btn" id="periodCancelBtn" type="button"><span class="btn-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span><span>Cancelar</span></button>
