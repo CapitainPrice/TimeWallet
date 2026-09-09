@@ -385,7 +385,7 @@
         foto: manualBase64,
         data: dataFmt,
         horario: saida,
-        localizacao: localizacaoPadrao,
+        localizacao: localizacaoPadrao ? App.getLocationDisplay(localizacaoPadrao) : null,
         usuario: App.obterNomeUsuario(),
         saldo: App.formatarSaldoTexto(extraMin),
       });

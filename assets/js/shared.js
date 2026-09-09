@@ -142,6 +142,11 @@
     return config;
   }
 
+  function shortenDisplayName(displayName) {
+    if (!displayName) return null;
+    return displayName.split(",").map((item) => item.trim()).slice(0, 3).filter((item) => item.length > 1).join(", ");
+  }
+
   async function geocodeAddress(address) {
     try {
       const response = await fetch(
@@ -152,10 +157,7 @@
       const data = await response.json();
       const result = data?.[0];
       if (!result) return null;
-      const address2 = result.display_name
-        ? result.display_name.split(",").map((item) => item.trim()).slice(0, 3).filter((item) => item.length > 1).join(", ")
-        : address;
-      return { lat: Number(result.lat), lng: Number(result.lon), address: address2 };
+      return { lat: Number(result.lat), lng: Number(result.lon), address: shortenDisplayName(result.display_name) || address };
     } catch (error) {
       console.warn("Forward geocoding error:", error);
       return null;
@@ -325,11 +327,7 @@
       );
       if (!response.ok) throw new Error("Geocoding failed");
       const data = await response.json();
-      let address = "Endereço não encontrado";
-      if (data.display_name) {
-        const parts = data.display_name.split(",").map((item) => item.trim());
-        address = parts.slice(0, 3).filter((item) => item.length > 1).join(", ");
-      }
+      const address = shortenDisplayName(data.display_name) || "Endereço não encontrado";
       GEOCODING_CACHE.set(key, address);
       return address;
     } catch (error) {
